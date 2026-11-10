@@ -1,0 +1,26 @@
+[project]
+name = "nano-agent"
+version = "0.1.0"
+description = "A minimal coding agent for learning how to build AI agents"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.78.0",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+]
+
+[project.scripts]
+nano-agent = "nano_agent.main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ipykernel>=7.1.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.31.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nano_agent"]
