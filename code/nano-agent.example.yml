@@ -1,16 +1,24 @@
 # Nano Agent Configuration
 # Copy this file to nano-agent.yml and customize as needed.
 
-model: claude-sonnet-4-6
+# LLM provider: gemini (default) or anthropic
+#   gemini    needs GEMINI_API_KEY (or GOOGLE_API_KEY)
+#   anthropic needs ANTHROPIC_API_KEY
+provider: gemini
+
+# Leave model out to use the provider's default (gemini-3.7-flash / claude-sonnet-4-6).
+# Check current Gemini model names at https://ai.google.dev/gemini-api/docs/models
+# model: gemini-3.7-flash
+
 max_tokens: 16000
 max_turns: 20
 
-# adaptive: let current Claude models decide when and how much to think
-# enabled: use a manual budget on older supported models
-# disabled: do not request thinking blocks
+# adaptive: let the model decide when and how much to think
+# enabled: use a manual budget (thinking_budget_tokens)
+# disabled: do not request thinking (some models always think)
 thinking_mode: adaptive
 # thinking_budget_tokens: 8000
 
-# Skip tool approval prompts (default: false)
-# When true, all tool calls are auto-approved without asking.
+# Terminal agent only: skip tool approval prompts (default: false).
+# The web console (nano-agent-console) uses its own risk rules instead.
 skip_approval: false

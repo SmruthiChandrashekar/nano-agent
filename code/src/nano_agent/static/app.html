@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nano-agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* nano-agent app. Light glass look (team reference): warm off-white page, frosted tiles with mint/blush glows, pill controls.
+   Layout: sidebar (projects + chats) | main (home or chat) | optional permissions drawer. */
+:root {
+  color-scheme: light;
+  --bg: #F4F1EC; --ink: #2E3436; --text: #3F4749; --muted: #6A7375;
+  --mint-1: #93D3C6; --mint-2: #69B6A8; --mint-glow: rgba(138,206,192,.42); --pink-glow: rgba(242,188,182,.50);
+  --pink-1: #F8DCD7; --pink-2: #F0C6C0;
+  --tile-top: rgba(255,255,255,.78); --tile-bottom: rgba(255,255,255,.46); --rim: rgba(255,255,255,.96);
+  --edge: rgba(140,152,152,.30); --track-off: rgba(212,220,219,.75); --focus: #4E9F90;
+  --mint-bg: #DCEFEA; --mint-ink: #2C6A5E; --amber-bg: #F5E8CE; --amber-ink: #6A4B12;
+  --gray-bg: #ECEEEE; --gray-ink: #4A5254; --pink-bg: #F7DDD9; --pink-ink: #8A3A31;
+  --add-bg: rgba(160,216,196,.45); --del-bg: rgba(244,196,190,.55);
+  --font-ui: 'Inter', 'Helvetica Neue', 'Segoe UI', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: radial-gradient(60% 45% at 30% 0%, rgba(255,255,255,.75), transparent 70%), radial-gradient(40% 35% at 95% 95%, rgba(138,206,192,.18), transparent 70%), var(--bg);
+  color: var(--text); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; letter-spacing: -.005em; overflow: hidden; }
+h1, h2, h3 { margin: 0; color: var(--ink); text-wrap: balance; }
+p { margin: 0; }
+b, strong { font-weight: 500; color: var(--ink); }
+button { font: inherit; cursor: pointer; color: inherit; letter-spacing: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.mono { font-family: var(--font-mono); }
+svg.i { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.tile { border-radius: 28px; background: linear-gradient(180deg, var(--tile-top), var(--tile-bottom));
+  -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); border: 1.5px solid var(--rim);
+  box-shadow: 0 0 0 1px var(--edge), 0 14px 34px rgba(70,90,90,.10), inset 0 2px 0 rgba(255,255,255,.95), inset 0 -3px 8px rgba(150,170,170,.12); }
+.glow-br { background: radial-gradient(55% 50% at 78% 80%, var(--mint-glow), transparent 72%), linear-gradient(180deg, var(--tile-top), var(--tile-bottom)); }
+.glow-tl { background: radial-gradient(50% 45% at 22% 30%, var(--mint-glow), transparent 72%), linear-gradient(180deg, var(--tile-top), var(--tile-bottom)); }
+.glow-pink { background: radial-gradient(60% 55% at 70% 65%, var(--pink-glow), transparent 75%), linear-gradient(180deg, rgba(255,246,244,.82), rgba(252,232,229,.58)); }
+.pill-surface, .btn-secondary, .chip, .switch-pill, .seg, .btn-undo, .fact, .input, textarea, select {
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(246,248,247,.82)); border: 1px solid #FFFFFF;
+  box-shadow: 0 0 0 1px var(--edge), 0 4px 12px rgba(70,90,90,.08), inset 0 1px 0 #FFFFFF; }
+.input, textarea, select { font: inherit; color: var(--ink); border-radius: 18px; padding: 10px 14px; width: 100%; }
+
+.btn { border-radius: 999px; padding: 9px 20px; font-size: 14.5px; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { border: 1px solid rgba(255,255,255,.7); background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #FFFFFF; font-weight: 500; text-shadow: 0 1px 1px rgba(30,90,80,.35); box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 6px 16px rgba(80,160,145,.32); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-secondary { color: var(--ink); }
+.btn-danger { border: 1px solid #FFFFFF; background: linear-gradient(180deg, var(--pink-1), var(--pink-2)); color: var(--pink-ink); font-weight: 500; box-shadow: 0 0 0 1px rgba(200,150,145,.35), 0 4px 12px rgba(200,120,110,.18), inset 0 1px 0 rgba(255,255,255,.8); }
+.btn-danger:disabled { opacity: .45; cursor: not-allowed; }
+.btn-quiet { border: 0; background: transparent; color: var(--muted); }
+.icon-btn { border: 0; background: transparent; color: var(--muted); width: 32px; height: 32px; border-radius: 10px; display: inline-grid; place-items: center; }
+.icon-btn:hover { background: rgba(255,255,255,.7); color: var(--ink); }
+
+.seg { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 4px; border-radius: 999px; }
+.seg button { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; font-size: 13.5px; color: var(--muted); }
+.seg button[aria-checked="true"] { background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #FFFFFF; font-weight: 500; text-shadow: 0 1px 1px rgba(30,90,80,.35); box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 3px 10px rgba(80,160,145,.32); }
+.switch-pill { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 6px 6px 6px 16px; border-radius: 999px; text-align: left; }
+.switch-pill .sp-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.switch-pill .sp-text b { font-weight: 400; font-size: 14.5px; }
+.switch-pill .sp-text small { color: var(--muted); font-size: 12px; }
+.switch-pill .track { position: relative; flex: none; width: 50px; height: 28px; border-radius: 999px; background: var(--track-off); box-shadow: inset 0 1px 3px rgba(0,0,0,.10); transition: background .2s; }
+.switch-pill .knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 6px rgba(40,60,60,.25); transition: transform .2s; }
+.switch-pill[aria-checked="true"] .track { background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); }
+.switch-pill[aria-checked="true"] .knob { transform: translateX(22px); }
+.switch-pill:disabled { cursor: not-allowed; opacity: .7; }
+.switch-pill.compact { width: auto; padding: 3px 3px 3px 12px; gap: 8px; }
+.switch-pill.compact .sp-text b { font-size: 13.5px; }
+.switch-pill.compact .track { width: 40px; height: 24px; }
+.switch-pill.compact .knob { width: 18px; height: 18px; }
+.switch-pill.compact[aria-checked="true"] .knob { transform: translateX(16px); }
+
+/* shell */
+.shell { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 16px; height: 100vh; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
+.shell.drawer-open { grid-template-columns: 290px minmax(0, 1fr) 330px; }
+@media (max-width: 900px) {
+  .shell, .shell.drawer-open { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { position: fixed; inset: 12px auto 12px 12px; width: min(300px, calc(100vw - 24px)); z-index: 20; transform: translateX(-110%); transition: transform .2s; }
+  .sidebar.open { transform: none; }
+  .drawer { position: fixed; inset: 12px 12px 12px auto; width: min(340px, calc(100vw - 24px)); z-index: 20; }
+}
+.sidebar { display: flex; flex-direction: column; min-height: 0; padding: 16px 12px; gap: 12px; }
+.brand { display: flex; align-items: center; justify-content: space-between; padding: 2px 8px; }
+.brand b { font-size: 18px; font-weight: 400; display: flex; align-items: center; gap: 10px; }
+.logo { width: 26px; height: 26px; border-radius: 9px; background: linear-gradient(160deg, var(--mint-1), var(--mint-2)); box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 4px 10px rgba(80,160,145,.3); display: inline-grid; place-items: center; color: #fff; font-weight: 600; font-size: 13px; }
+.side-actions { display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+.side-actions .btn { justify-content: center; }
+.search { border-radius: 999px; padding: 8px 14px; font-size: 14px; }
+.side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 4px; padding: 2px 4px; }
+.side-h { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 4px; color: var(--muted); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; }
+.proj { display: flex; flex-direction: column; }
+.proj-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 14px; border: 0; background: transparent; width: 100%; text-align: left; color: var(--ink); }
+.proj-row:hover, .proj-row.current { background: rgba(255,255,255,.65); }
+.proj-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-row .count { font-size: 12px; color: var(--muted); }
+.proj-tools { display: none; gap: 2px; }
+.proj:hover .proj-tools, .proj:focus-within .proj-tools { display: inline-flex; }
+.chat-list { list-style: none; margin: 0 0 6px; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 1px; }
+.chat-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; cursor: pointer; font-size: 14px; color: var(--text); border: 0; background: transparent; width: 100%; text-align: left; }
+.chat-row:hover { background: rgba(255,255,255,.6); }
+.chat-row.active { background: linear-gradient(180deg, #FFFFFF, #F3F8F6); box-shadow: 0 0 0 1px var(--edge), 0 3px 10px rgba(70,90,90,.08); color: var(--ink); }
+.chat-row .tt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-row .when { font-size: 11.5px; color: var(--muted); }
+.chat-li { position: relative; }
+.chat-li .del { position: absolute; right: 4px; top: 3px; display: none; }
+.chat-li:hover .del, .chat-li:focus-within .del { display: inline-grid; }
+.chat-li:hover .when { visibility: hidden; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--mint-2); box-shadow: 0 0 0 3px rgba(105,182,168,.25); }
+.dot.wait { background: #D7A64A; box-shadow: 0 0 0 3px rgba(215,166,74,.25); }
+.confirm { display: flex; gap: 6px; align-items: center; font-size: 13px; padding: 4px 8px; color: var(--pink-ink); }
+.side-foot { padding: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.fact { border-radius: 999px; padding: 4px 12px; font-size: 12.5px; color: var(--muted); }
+.fact.ok { background: var(--mint-bg); color: var(--mint-ink); }
+.fact.bad { background: var(--pink-bg); color: var(--pink-ink); }
+.fact.warn { background: var(--amber-bg); color: var(--amber-ink); }
+
+/* main */
+.main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.home { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 6vh 8px 40px; gap: 26px; }
+.home-inner { width: min(780px, 100%); display: flex; flex-direction: column; gap: 22px; }
+.hello { text-align: center; display: flex; flex-direction: column; gap: 6px; }
+.hello h1 { font-size: clamp(30px, 4.4vw, 44px); font-weight: 300; letter-spacing: -.025em; }
+.hello p { color: var(--muted); }
+.suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip { border-radius: 999px; padding: 7px 14px; font-size: 13.5px; color: var(--text); display: inline-flex; gap: 8px; align-items: center; }
+.chip:hover { color: var(--ink); }
+.chip.on { background: linear-gradient(180deg, #E9F6F2, #D6EEE8); color: var(--mint-ink); }
+.recent { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.recent-card { padding: 14px 16px; border-radius: 22px; text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.recent-card .tt { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-card small { color: var(--muted); font-size: 12.5px; }
+.section-h { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.empty-card { padding: 22px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+
+.composer { padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 10px; }
+.composer textarea { border: 0; box-shadow: none; background: transparent; resize: none; min-height: 56px; max-height: 240px; padding: 6px 8px; font-size: 15.5px; }
+.composer textarea:focus-visible { outline: none; }
+.composer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.composer-bar .spacer { flex: 1; }
+.proj-select { width: auto; border-radius: 999px; padding: 6px 12px; font-size: 13.5px; max-width: 240px; }
+.send { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,.7); background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #fff; display: grid; place-items: center; box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 6px 16px rgba(80,160,145,.32); }
+.send:disabled { opacity: .45; cursor: not-allowed; }
+.composer.note-mode { box-shadow: 0 0 0 2px #E2C68E, 0 14px 34px rgba(70,90,90,.10); }
+
+.chat { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.chat-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px 12px 18px; }
+.chat-head .title { flex: 1; min-width: 160px; display: flex; flex-direction: column; }
+.chat-head .title strong { font-size: 17px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-head .title small { color: var(--muted); font-size: 12.5px; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { display: inline-flex; padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 500; background: var(--gray-bg); color: var(--gray-ink); }
+.status.wait { background: var(--amber-bg); color: var(--amber-ink); }
+.status.ok { background: var(--mint-bg); color: var(--mint-ink); }
+.stream { flex: 1; min-height: 0; overflow: auto; padding: 6px 6px 20px; }
+.stream-inner { width: min(860px, 100%); margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.msg-user { align-self: flex-end; max-width: min(620px, 88%); padding: 10px 16px; border-radius: 22px 22px 6px 22px; background: linear-gradient(180deg, #E6F4F0, #D5ECE6); color: var(--ink); box-shadow: 0 0 0 1px rgba(105,182,168,.25), 0 6px 14px rgba(80,160,145,.12), inset 0 1px 0 rgba(255,255,255,.8); white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg-agent { padding: 2px 6px; color: var(--ink); overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 8px; }
+.msg-agent pre { margin: 0; padding: 10px 14px; border-radius: 16px; background: rgba(255,255,255,.7); box-shadow: 0 0 0 1px var(--edge); overflow-x: auto; font-family: var(--font-mono); font-size: 13px; }
+.msg-agent code { font-family: var(--font-mono); font-size: 13px; background: rgba(255,255,255,.7); padding: 1px 6px; border-radius: 6px; }
+.msg-agent pre code { background: none; padding: 0; }
+.msg-agent ul, .msg-agent ol { margin: 0; padding-left: 22px; }
+.note { align-self: flex-start; padding: 7px 14px; border-radius: 16px; font-size: 13.5px; max-width: 90%; }
+.note.user { background: var(--amber-bg); color: var(--amber-ink); align-self: flex-end; }
+.note.agent { background: var(--mint-bg); color: var(--mint-ink); }
+.err { padding: 12px 16px; border-radius: 18px; background: var(--pink-bg); color: var(--pink-ink); overflow-wrap: anywhere; }
+.thought { color: var(--muted); font-size: 13.5px; font-style: italic; padding: 0 6px; display: flex; gap: 8px; align-items: center; }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } .switch-pill .track, .switch-pill .knob, .sidebar { transition: none; } }
+
+.step { border-radius: 18px; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; background: rgba(255,255,255,.55); box-shadow: 0 0 0 1px var(--edge), inset 0 1px 0 #fff; }
+.step.s-waiting { box-shadow: 0 0 0 2px #E2C68E; }
+.step-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.step .ico { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12.5px; font-weight: 500; flex: none; background: var(--gray-bg); color: var(--gray-ink); }
+.step.s-done .ico { background: var(--mint-bg); color: var(--mint-ink); }
+.step.s-running .ico { background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #fff; }
+.step.s-waiting .ico { background: var(--amber-bg); color: var(--amber-ink); }
+.step.s-failed .ico, .step.s-blocked .ico { background: var(--pink-bg); color: var(--pink-ink); }
+.step .st { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step.s-undone .st { text-decoration: line-through; color: var(--muted); }
+.step .meta { display: flex; gap: 6px; align-items: center; flex: none; font-size: 12.5px; color: var(--muted); }
+.step details summary { cursor: pointer; font-size: 12.5px; color: var(--muted); padding-left: 36px; list-style: none; }
+.step details summary::-webkit-details-marker { display: none; }
+.step details pre { margin: 6px 0 2px 36px; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.75); box-shadow: 0 0 0 1px var(--edge); font-family: var(--font-mono); font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
+.btn-undo { border-radius: 999px; padding: 3px 12px; font-size: 12.5px; color: var(--ink); flex: none; }
+.tag { display: inline-flex; align-items: center; padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 500; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(255,255,255,.8); }
+.tag-auto, .tag-allowed { background: var(--mint-bg); color: var(--mint-ink); }
+.tag-ask { background: var(--amber-bg); color: var(--amber-ink); }
+.tag-choice, .tag-blocked, .tag-undo { background: var(--gray-bg); color: var(--gray-ink); }
+.tag-perm { background: var(--pink-bg); color: var(--pink-ink); }
+
+.card { padding: 18px; display: flex; flex-direction: column; gap: 12px; border-radius: 24px; }
+.card-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; }
+.card-head .lbl { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.card h3 { font-family: var(--font-mono); font-weight: 500; font-size: 16px; overflow-wrap: anywhere; }
+.why { white-space: pre-wrap; }
+.warn { background: var(--pink-bg); color: var(--pink-ink); border-radius: 16px; padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; }
+.warn b { color: var(--pink-ink); }
+.warn code { font-family: var(--font-mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.what { background: rgba(255,255,255,.6); border-radius: 16px; padding: 9px 14px; font-size: 14px; box-shadow: 0 0 0 1px var(--edge); overflow-wrap: anywhere; }
+.diff { border-radius: 16px; overflow: auto; max-height: 320px; font-family: var(--font-mono); font-size: 12.5px; background: rgba(255,255,255,.72); box-shadow: 0 0 0 1px var(--edge); }
+.diff div { display: grid; grid-template-columns: 72px minmax(0, 1fr); white-space: pre; }
+.diff .lbl { padding: 2px 10px; color: var(--muted); font-family: var(--font-ui); font-size: 11.5px; }
+.diff .code { padding: 2px 10px; }
+.diff .add { background: var(--add-bg); }
+.diff .del { background: var(--del-bg); }
+.diff .hunk { color: var(--muted); background: rgba(236,238,238,.7); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.kbd { font-size: 12px; color: var(--muted); }
+.plan-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.plan-list li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
+.plan-list .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.plan-list .pt { color: var(--ink); overflow-wrap: anywhere; }
+.plan-list .pw { color: var(--muted); font-size: 13px; }
+.badge { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.badge.ok { background: var(--mint-bg); color: var(--mint-ink); }
+.badge.no { background: var(--pink-bg); color: var(--pink-ink); }
+.badge.wait { background: var(--amber-bg); color: var(--amber-ink); }
+.summary ul { margin: 0; padding-left: 18px; }
+.summary li { overflow-wrap: anywhere; }
+
+/* drawer */
+.drawer { display: flex; flex-direction: column; min-height: 0; padding: 18px 14px; gap: 14px; overflow: auto; }
+.drawer-h { display: flex; justify-content: space-between; align-items: center; }
+.drawer-h h2 { font-size: 18px; font-weight: 400; }
+.group { display: flex; flex-direction: column; gap: 8px; }
+.group > .lbl { font-size: 13px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .chip { font-family: var(--font-mono); font-size: 12.5px; padding: 5px 12px; cursor: pointer; }
+.chips .chip input { accent-color: var(--mint-2); }
+.foot-note { font-size: 12px; color: var(--muted); }
+
+/* modal */
+.modal-back { position: fixed; inset: 0; z-index: 30; background: rgba(60,70,70,.18); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 16px; }
+.modal { width: min(640px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 14px; padding: 22px; }
+.modal h2 { font-size: 22px; font-weight: 400; }
+.places { display: flex; flex-wrap: wrap; gap: 6px; }
+.pathbar { display: flex; gap: 8px; align-items: center; }
+.pathbar .input { font-family: var(--font-mono); font-size: 13px; border-radius: 999px; }
+.dirs { flex: 1; min-height: 160px; max-height: 42vh; overflow: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 20px; background: rgba(255,255,255,.5); box-shadow: 0 0 0 1px var(--edge); }
+.dir { display: flex; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 12px; border: 0; background: transparent; text-align: left; width: 100%; color: var(--ink); }
+.dir:hover { background: rgba(255,255,255,.85); }
+.modal-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+
+.toast { position: fixed; right: 18px; bottom: 18px; max-width: min(420px, calc(100vw - 36px)); padding: 12px 12px 12px 18px; display: flex; gap: 12px; align-items: center; border-radius: 24px; z-index: 40; }
+.toast b { display: block; }
+.toast.err { background: radial-gradient(60% 55% at 70% 65%, var(--pink-glow), transparent 75%), linear-gradient(180deg, rgba(255,246,244,.96), rgba(252,232,229,.88)); }
+.menu-btn { display: none; }
+@media (max-width: 900px) { .menu-btn { display: inline-grid; } }
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <aside class="sidebar tile" id="sidebar" aria-label="Projects and chats"></aside>
+  <main class="main" id="main"></main>
+  <aside class="drawer tile" id="drawer" hidden aria-label="Permissions"></aside>
+</div>
+<div class="modal-back" id="modal" hidden></div>
+<div class="toast tile" id="toast" hidden role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+  /* ------------------------------------------------------------------ icons */
+  var I = {
+    plus: '<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+    folder: '<svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+    folderPlus: '<svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>',
+    chat: '<svg class="i" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
+    send: '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+    sliders: '<svg class="i" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
+    trash: '<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
+    x: '<svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    menu: '<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+    up: '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+    edit: '<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+    chev: '<svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+    chevD: '<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>'
+  };
+  var SETTINGS = [
+    { key: "edit", label: "Edit files", note: "Undoable" },
+    { key: "delete", label: "Delete files", note: "Always asks" },
+    { key: "secret", label: "Secret or config files", note: ".env, settings" },
+    { key: "install", label: "Install packages", note: "pip, npm" },
+    { key: "command", label: "Run other commands", note: "Tests, scripts" },
+    { key: "push", label: "Push to GitHub", note: "Permanent · always asks" }
+  ];
+  var TAGS = { auto: ["tag-auto", "Runs on its own"], ask: ["tag-ask", "Asks first"], choice: ["tag-choice", "Your choice"],
+    perm: ["tag-perm", "Permanent"], blocked: ["tag-blocked", "Out of scope"], allowed: ["tag-allowed", "Allowed for this task"] };
+  var STATUS = { running: ["◐", "Running"], waiting: ["!", "Waiting for you"], done: ["✓", "Done"], skipped: ["↷", "Skipped"],
+    failed: ["✕", "Failed"], undone: ["↶", "Undone"], blocked: ["⊘", "Out of scope"], notrun: ["–", "Not run"] };
+  var SUGGEST = ["Clean up unused files in this project", "Explain how this project works", "Find and fix a bug in", "Add tests for"];
+
+  /* ------------------------------------------------------------------ state */
+  var A = {
+    info: null, projects: [], connected: false, view: "home", chatId: null, chat: null, project: null,
+    items: [], cstate: {}, thinking: "", currentProject: null, settings: {}, preset: "risky", planFirst: true, sound: false,
+    scopeMode: "all", scopeFiles: [], entries: [], drawer: false, sidebarOpen: false, filter: "", text: "",
+    expanded: {}, open: {}, confirm: null, renaming: false, pendingRef: null, modal: null
+  };
+  function load(k, d) { try { var v = localStorage.getItem("nano." + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem("nano." + k, JSON.stringify(v)); } catch (e) { } }
+  A.planFirst = load("planFirst", true); A.sound = load("sound", false); A.expanded = load("expanded", {});
+
+  /* ------------------------------------------------------------------ helpers */
+  function $(s) { return document.querySelector(s); }
+  function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+  function api(method, url, body) {
+    return fetch(url, { method: method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Request failed"); return j; }); });
+  }
+  function ago(t) {
+    if (!t) return ""; var s = Date.now() / 1000 - t;
+    if (s < 60) return "now"; if (s < 3600) return Math.floor(s / 60) + "m"; if (s < 86400) return Math.floor(s / 3600) + "h"; return Math.floor(s / 86400) + "d";
+  }
+  function tag(k) { var t = TAGS[k] || TAGS.choice; return '<span class="tag ' + t[0] + '">' + t[1] + "</span>"; }
+  function sw(id, on, label, note, extra, compact) {
+    return '<button type="button" class="switch-pill' + (compact ? " compact" : "") + '" role="switch" id="' + id + '" aria-checked="' + !!on + '"' + (extra || "") + '>' +
+      '<span class="sp-text"><b>' + esc(label) + "</b>" + (note ? "<small>" + esc(note) + "</small>" : "") + '</span><span class="track" aria-hidden="true"><span class="knob"></span></span></button>';
+  }
+  function stepTitle(s) {
+    var p = s.params || {};
+    switch (s.tool) {
+      case "read_file": return "Read " + (p.file_path || "");
+      case "edit_file": return "Edit " + (p.file_path || "");
+      case "write_file": return "Write " + (p.file_path || "");
+      case "delete_file": return "Delete " + (p.file_path || "");
+      case "list_directory": return "List " + (p.path || ".");
+      case "find_files": return "Find " + (p.pattern || "");
+      case "run_bash": return "Run " + (p.command || "");
+      default: return (s.tool || "") + " " + (s.target || "");
+    }
+  }
+  function md(text) {
+    var out = [], blocks = String(text || "").split(/```/);
+    blocks.forEach(function (b, i) {
+      if (i % 2) { out.push("<pre><code>" + esc(b.replace(/^[a-z0-9+-]*\n/i, "")) + "</code></pre>"); return; }
+      var lines = b.split("\n"), list = null, para = [];
+      function inline(s) { return esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"); }
+      function flush() { if (para.length) { out.push("<p>" + inline(para.join(" ")) + "</p>"); para = []; } if (list) { out.push("<" + list.t + ">" + list.items.map(function (x) { return "<li>" + inline(x) + "</li>"; }).join("") + "</" + list.t + ">"); list = null; } }
+      lines.forEach(function (l) {
+        var m = l.match(/^\s*([-*]|\d+\.)\s+(.*)$/);
+        if (m) { var t = /\d/.test(m[1]) ? "ol" : "ul"; if (para.length) { out.push("<p>" + inline(para.join(" ")) + "</p>"); para = []; } if (!list || list.t !== t) { if (list) flush(); list = { t: t, items: [] }; } list.items.push(m[2]); }
+        else if (!l.trim()) flush();
+        else { if (list) flush(); para.push(l.trim()); }
+      });
+      flush();
+    });
+    return out.join("");
+  }
+  function projectById(id) { return A.projects.find(function (p) { return p.id === id; }) || null; }
+  function defaults() { return Object.assign({}, A.info ? A.info.settings : {}); }
+  function scopeValue() { return A.scopeMode === "chosen" && A.scopeFiles.length ? A.scopeFiles.map(function (f) { return f.replace(/\/$/, ""); }) : null; }
+
+  /* ------------------------------------------------------------------ notify */
+  var audio = null, toastTimer = null, titleBase = document.title;
+  function primeAudio() { try { if (!audio) { var C = window.AudioContext || window.webkitAudioContext; if (C) audio = new C(); } if (audio && audio.state === "suspended") audio.resume(); } catch (e) { audio = null; } }
+  function beep() { if (!A.sound || !audio) return; try { var o = audio.createOscillator(), g = audio.createGain(); o.frequency.value = 880; g.gain.value = .06; o.connect(g); g.connect(audio.destination); o.start(); o.stop(audio.currentTime + .18); } catch (e) { } }
+  function toast(html, opts) {
+    var el = $("#toast"); opts = opts || {};
+    el.className = "toast tile" + (opts.error ? " err" : "");
+    el.innerHTML = "<div>" + html + "</div>" + (opts.action ? '<button type="button" class="btn btn-primary" id="toast-go">' + esc(opts.action) + "</button>" : "");
+    el.hidden = false;
+    var go = $("#toast-go"); if (go) go.onclick = function () { el.hidden = true; opts.onAction && opts.onAction(); };
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, opts.error ? 8000 : 6000);
+  }
+  function needsYou(chatId, what) {
+    var here = chatId === A.chatId && A.view === "chat";
+    document.title = "(1) Needs you · " + titleBase;
+    beep();
+    try { if (document.hidden && "Notification" in window && Notification.permission === "granted") new Notification("nano-agent needs you", { body: what }); } catch (e) { }
+    if (!here) toast("<b>A chat needs you</b>" + esc(what), { action: "Open", onAction: function () { openChat(chatId); } });
+  }
+
+  /* ------------------------------------------------------------------ connection */
+  var ws = null;
+  function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); else toast("<b>Not connected</b>Reconnecting…", { error: true }); }
+  function connect() {
+    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+    ws.onopen = function () { A.connected = true; if (A.chatId) openChat(A.chatId, true); else render(); };
+    ws.onclose = function () { A.connected = false; render(); setTimeout(connect, 2000); };
+    ws.onmessage = function (ev) { onMessage(JSON.parse(ev.data)); };
+  }
+  function upsert(item) {
+    var i = A.items.findIndex(function (x) { return x.id === item.id; });
+    if (i === -1) A.items.push(item); else A.items[i] = item;
+  }
+  function onMessage(m) {
+    if (m.type === "projects") { A.projects = m.projects; renderSidebar(); if (A.view === "home") renderMain(); return; }
+    if (m.type === "chat_created") {
+      if (m.ref && m.ref === A.pendingRef) { A.pendingRef = null; A.chatId = m.chat_id; location.hash = "chat-" + m.chat_id; openChat(m.chat_id, true); }
+      return;
+    }
+    if (m.type === "error") { toast("<b>Something needs attention</b>" + esc(m.message), { error: true }); return; }
+    var here = m.chat_id && m.chat_id === A.chatId;
+    if (m.type === "item") {
+      var it = m.item;
+      if (it.kind === "step" && it.status === "waiting") needsYou(m.chat_id, stepTitle(it));
+      if (it.kind === "plan" && it.status === "pending") needsYou(m.chat_id, "Review the plan");
+      if (here) { upsert(it); if (it.kind === "agent") A.thinking = ""; renderMain(); }
+    } else if (m.type === "state" && here) {
+      A.cstate = m; if (!m.running) { A.thinking = ""; document.title = titleBase; } if (!m.waiting && !m.plan_pending) document.title = titleBase; renderMain();
+    } else if (m.type === "thinking" && here) { A.thinking = m.text; renderMain(); }
+  }
+
+  /* ------------------------------------------------------------------ navigation */
+  function goHome(projectId) {
+    A.view = "home"; A.chatId = null; A.items = []; A.cstate = {}; A.sidebarOpen = false;
+    if (projectId) A.currentProject = projectId;
+    location.hash = ""; loadEntries(); render();
+    setTimeout(function () { var t = $("#composer-text"); if (t) t.focus(); }, 30);
+  }
+  function openChat(id, keepScroll) {
+    api("GET", "/api/chats/" + id).then(function (d) {
+      A.view = "chat"; A.chatId = id; A.chat = d.chat; A.project = d.project; A.items = d.items; A.cstate = d.state;
+      A.currentProject = d.project.id; A.sidebarOpen = false; A.renaming = false; location.hash = "chat-" + id;
+      A.expanded[d.project.id] = true; save("expanded", A.expanded); save("lastProject", d.project.id);
+      loadEntries(); render(); if (!keepScroll) scrollBottom(true);
+    }).catch(function (e) { toast("<b>Couldn't open the chat</b>" + esc(e.message), { error: true }); goHome(); });
+  }
+  function loadEntries() {
+    var p = A.currentProject; A.entries = []; A.scopeFiles = [];
+    if (!p) return;
+    api("GET", "/api/projects/" + p + "/entries").then(function (d) { A.entries = d.entries; A.scopeFiles = d.entries.slice(); if (A.drawer) renderDrawer(); }).catch(function () { });
+  }
+
+  /* ------------------------------------------------------------------ actions */
+  function submit() {
+    var box = $("#composer-text"), text = (box ? box.value : A.text).trim();
+    if (!text) return;
+    primeAudio();
+    try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch (e) { }
+    var msg = { type: "send", text: text, settings: A.settings, scope: scopeValue(), plan_first: A.planFirst };
+    if (A.view === "chat" && A.chatId) {
+      msg.chat_id = A.chatId;
+      if (A.cstate.paused) { send({ type: "resume", chat_id: A.chatId, note: text }); A.text = ""; renderMain(); return; }
+    } else {
+      if (!A.currentProject) { openImport(); toast("<b>Import a folder first</b>The agent needs a project folder to work in.", { error: true }); return; }
+      msg.project_id = A.currentProject; msg.ref = Math.random().toString(36).slice(2);
+      A.pendingRef = msg.ref; A.view = "chat"; A.chatId = null; A.project = projectById(A.currentProject);
+      A.chat = { title: text.slice(0, 60) }; A.items = [{ id: "pending", kind: "user", text: text }]; A.cstate = { running: true };
+    }
+    send(msg); A.text = ""; if (box) box.value = ""; render(); scrollBottom(true);
+  }
+  function decide(itemId, action) {
+    var allow = $("#allow-" + itemId);
+    send({ type: "decision", chat_id: A.chatId, item_id: itemId, action: action, allow_task: !!(allow && allow.getAttribute("aria-checked") === "true") });
+    var it = A.items.find(function (x) { return x.id === itemId; }); if (it) it.status = action === "approve" ? "running" : "skipped";
+    document.title = titleBase; renderMain();
+  }
+  function setPreset(p) {
+    A.preset = p; A.settings = defaults();
+    if (p === "every") SETTINGS.forEach(function (s) { A.settings[s.key] = true; });
+    if (A.chatId && A.cstate.running) send({ type: "settings", chat_id: A.chatId, settings: A.settings });
+    render();
+  }
+  function toggleSetting(k) {
+    if (A.info && A.info.locked.indexOf(k) !== -1) return;
+    A.settings[k] = !A.settings[k];
+    var d = defaults();
+    var all = SETTINGS.every(function (s) { return A.settings[s.key]; }), dflt = SETTINGS.every(function (s) { return A.settings[s.key] === d[s.key]; });
+    A.preset = all ? "every" : dflt ? "risky" : "custom";
+    if (A.chatId && A.cstate.running) send({ type: "settings", chat_id: A.chatId, settings: A.settings });
+    render();
+  }
+  function scrollBottom(force) {
+    var s = $("#stream"); if (!s) return;
+    if (force || s.scrollTop + s.clientHeight >= s.scrollHeight - 120) s.scrollTop = s.scrollHeight;
+  }
+
+  /* ------------------------------------------------------------------ import dialog */
+  function openImport(path) {
+    A.modal = { path: path || "", dirs: [], places: [], parent: null, error: "", newName: "", making: false };
+    browseTo(path || null);
+  }
+  function browseTo(path) {
+    api("GET", "/api/browse" + (path ? "?path=" + encodeURIComponent(path) : "")).then(function (d) {
+      A.modal = Object.assign(A.modal || {}, { path: d.path, dirs: d.dirs, places: d.places, parent: d.parent, error: "" }); renderModal();
+    }).catch(function (e) { if (A.modal) { A.modal.error = e.message; renderModal(); } });
+  }
+  function importHere() {
+    api("POST", "/api/projects", { path: A.modal.path }).then(function (p) {
+      A.modal = null; renderModal(); A.expanded[p.id] = true; save("expanded", A.expanded);
+      toast("<b>Project added</b>" + esc(p.name)); goHome(p.id);
+    }).catch(function (e) { A.modal.error = e.message; renderModal(); });
+  }
+  function createHere() {
+    var name = ($("#new-name") || {}).value || "";
+    api("POST", "/api/projects/create", { parent: A.modal.path, name: name }).then(function (p) {
+      A.modal = null; renderModal(); A.expanded[p.id] = true; save("expanded", A.expanded);
+      toast("<b>Project created</b>" + esc(p.path)); goHome(p.id);
+    }).catch(function (e) { A.modal.error = e.message; renderModal(); });
+  }
+  function renderModal() {
+    var el = $("#modal"), m = A.modal;
+    if (!m) { el.hidden = true; el.innerHTML = ""; return; }
+    el.hidden = false;
+    el.innerHTML = '<div class="modal tile glow-tl" role="dialog" aria-modal="true" aria-labelledby="mh">' +
+      '<div class="drawer-h"><h2 id="mh">Import a folder</h2><button type="button" class="icon-btn" id="m-close" aria-label="Close">' + I.x + "</button></div>" +
+      '<p class="kbd">Pick the folder the agent may work in. Your files stay where they are.</p>' +
+      '<div class="places">' + (m.places || []).map(function (p) { return '<button type="button" class="chip" data-place="' + esc(p.path) + '">' + I.folder + esc(p.name) + "</button>"; }).join("") + "</div>" +
+      '<div class="pathbar"><button type="button" class="icon-btn" id="m-up" aria-label="Up one folder"' + (m.parent ? "" : " disabled") + ">" + I.up + '</button><input class="input" id="m-path" value="' + esc(m.path) + '" aria-label="Folder path"><button type="button" class="btn btn-secondary" id="m-go">Go</button></div>' +
+      '<div class="dirs" role="list">' + (m.dirs.length ? m.dirs.map(function (d) { return '<button type="button" class="dir" role="listitem" data-dir="' + esc(d) + '">' + I.folder + esc(d) + "</button>"; }).join("") : '<p class="kbd" style="padding:8px">No sub-folders here.</p>') + "</div>" +
+      (m.error ? '<div class="err">' + esc(m.error) + "</div>" : "") +
+      (m.making ? '<div class="pathbar"><input class="input" id="new-name" placeholder="New folder name" aria-label="New folder name"><button type="button" class="btn btn-primary" id="m-create">Create project</button><button type="button" class="btn btn-quiet" id="m-cancel-new">Cancel</button></div>' : "") +
+      '<div class="modal-foot"><button type="button" class="btn btn-secondary" id="m-new">' + I.folderPlus + 'New folder here</button><div class="row"><button type="button" class="btn btn-quiet" id="m-cancel">Cancel</button><button type="button" class="btn btn-primary" id="m-import">Import this folder</button></div></div></div>';
+    $("#m-close").onclick = $("#m-cancel").onclick = function () { A.modal = null; renderModal(); };
+    $("#m-up").onclick = function () { if (m.parent) browseTo(m.parent); };
+    $("#m-go").onclick = function () { browseTo($("#m-path").value); };
+    $("#m-path").onkeydown = function (e) { if (e.key === "Enter") browseTo(this.value); };
+    $("#m-import").onclick = importHere;
+    $("#m-new").onclick = function () { m.making = true; renderModal(); setTimeout(function () { $("#new-name").focus(); }, 20); };
+    if ($("#m-create")) { $("#m-create").onclick = createHere; $("#new-name").onkeydown = function (e) { if (e.key === "Enter") createHere(); }; $("#m-cancel-new").onclick = function () { m.making = false; renderModal(); }; }
+    el.querySelectorAll("[data-place]").forEach(function (b) { b.onclick = function () { browseTo(b.getAttribute("data-place")); }; });
+    el.querySelectorAll("[data-dir]").forEach(function (b) { b.onclick = function () { browseTo(m.path.replace(/[\\/]+$/, "") + (m.path.indexOf("\\") !== -1 ? "\\" : "/") + b.getAttribute("data-dir")); }; });
+    el.onclick = function (e) { if (e.target === el) { A.modal = null; renderModal(); } };
+  }
+
+  /* ------------------------------------------------------------------ sidebar */
+  function renderSidebar() {
+    var q = A.filter.toLowerCase();
+    var h = '<div class="brand"><b><span class="logo">n</span>nano-agent</b><button type="button" class="icon-btn menu-btn" id="side-close" aria-label="Close sidebar">' + I.x + "</button></div>" +
+      '<div class="side-actions"><button type="button" class="btn btn-primary" id="new-chat">' + I.plus + "New chat</button>" +
+      '<input class="input search" id="filter" placeholder="Search chats" value="' + esc(A.filter) + '" aria-label="Search chats"></div>' +
+      '<div class="side-h"><span>Projects</span><button type="button" class="icon-btn" id="import" title="Import a folder" aria-label="Import a folder">' + I.folderPlus + "</button></div>" +
+      '<div class="side-scroll">';
+    if (!A.projects.length) h += '<p class="kbd" style="padding:6px 10px">No projects yet. Import a folder to start.</p>';
+    A.projects.forEach(function (p) {
+      var chats = p.chats.filter(function (c) { return !q || (c.title || "").toLowerCase().indexOf(q) !== -1; });
+      if (q && !chats.length && p.name.toLowerCase().indexOf(q) === -1) return;
+      var open = q ? true : A.expanded[p.id] !== false;
+      var busy = p.chats.some(function (c) { return c.running; });
+      h += '<div class="proj"><div class="row" style="gap:0;flex-wrap:nowrap"><button type="button" class="proj-row' + (A.currentProject === p.id ? " current" : "") + '" data-proj="' + p.id + '" title="' + esc(p.path) + '" aria-expanded="' + open + '">' +
+        (open ? I.chevD : I.chev) + I.folder + '<span class="nm">' + esc(p.name) + "</span>" + (busy ? '<span class="dot" aria-label="running"></span>' : "") +
+        (p.exists === false ? '<span class="tag tag-perm">Missing</span>' : '<span class="count">' + p.chats.length + "</span>") + "</button>" +
+        '<span class="proj-tools"><button type="button" class="icon-btn" data-newin="' + p.id + '" title="New chat in ' + esc(p.name) + '" aria-label="New chat in ' + esc(p.name) + '">' + I.plus + '</button><button type="button" class="icon-btn" data-forget="' + p.id + '" title="Remove from list" aria-label="Remove ' + esc(p.name) + ' from the list">' + I.x + "</button></span></div>";
+      if (A.confirm && A.confirm.kind === "project" && A.confirm.id === p.id) {
+        h += '<div class="confirm">Remove from the list? Files stay.<button type="button" class="btn btn-danger" data-yes-proj="' + p.id + '">Remove</button><button type="button" class="btn btn-quiet" data-no>Cancel</button></div>';
+      }
+      if (open) {
+        h += '<ul class="chat-list">' + (chats.length ? chats.map(function (c) {
+          var conf = A.confirm && A.confirm.kind === "chat" && A.confirm.id === c.id;
+          return '<li class="chat-li"><button type="button" class="chat-row' + (c.id === A.chatId ? " active" : "") + '" data-chat="' + c.id + '">' +
+            (c.running ? '<span class="dot' + (c.waiting ? " wait" : "") + '"></span>' : "") + '<span class="tt">' + esc(c.title || "New chat") + '</span><span class="when">' + ago(c.updated) + "</span></button>" +
+            '<button type="button" class="icon-btn del" data-delchat="' + c.id + '" aria-label="Delete chat">' + I.trash + "</button>" +
+            (conf ? '<div class="confirm">Delete this chat?<button type="button" class="btn btn-danger" data-yes-chat="' + c.id + '">Delete</button><button type="button" class="btn btn-quiet" data-no>Cancel</button></div>' : "") + "</li>";
+        }).join("") : '<li class="kbd" style="padding:4px 8px">No chats yet</li>') + "</ul>";
+      }
+      h += "</div>";
+    });
+    h += "</div>";
+    var info = A.info;
+    h += '<div class="side-foot">' + (A.connected ? '<span class="fact ok">Connected</span>' : '<span class="fact bad">Offline · retrying</span>') +
+      (info ? '<span class="fact">' + esc(info.provider) + " · " + esc(info.model) + "</span>" + (info.demo ? '<span class="fact warn">Demo mode</span>' : "") : "") + "</div>";
+    var side = $("#sidebar"); side.innerHTML = h; side.classList.toggle("open", A.sidebarOpen);
+
+    $("#new-chat").onclick = function () { goHome(A.currentProject); };
+    $("#import").onclick = function () { openImport(); };
+    $("#side-close").onclick = function () { A.sidebarOpen = false; renderSidebar(); };
+    var f = $("#filter"); f.oninput = function () { A.filter = f.value; renderSidebar(); var g = $("#filter"); g.focus(); g.setSelectionRange(g.value.length, g.value.length); };
+    side.querySelectorAll("[data-proj]").forEach(function (b) { b.onclick = function () { var id = b.getAttribute("data-proj"); A.expanded[id] = A.expanded[id] === false; save("expanded", A.expanded); A.currentProject = id; save("lastProject", id); loadEntries(); render(); }; });
+    side.querySelectorAll("[data-newin]").forEach(function (b) { b.onclick = function () { goHome(b.getAttribute("data-newin")); }; });
+    side.querySelectorAll("[data-chat]").forEach(function (b) { b.onclick = function () { openChat(b.getAttribute("data-chat")); }; });
+    side.querySelectorAll("[data-delchat]").forEach(function (b) { b.onclick = function () { A.confirm = { kind: "chat", id: b.getAttribute("data-delchat") }; renderSidebar(); }; });
+    side.querySelectorAll("[data-forget]").forEach(function (b) { b.onclick = function () { A.confirm = { kind: "project", id: b.getAttribute("data-forget") }; renderSidebar(); }; });
+    side.querySelectorAll("[data-no]").forEach(function (b) { b.onclick = function () { A.confirm = null; renderSidebar(); }; });
+    side.querySelectorAll("[data-yes-chat]").forEach(function (b) { b.onclick = function () {
+      var id = b.getAttribute("data-yes-chat"); A.confirm = null;
+      api("DELETE", "/api/chats/" + id).then(function () { if (A.chatId === id) goHome(A.currentProject); });
+    }; });
+    side.querySelectorAll("[data-yes-proj]").forEach(function (b) { b.onclick = function () {
+      var id = b.getAttribute("data-yes-proj"); A.confirm = null;
+      api("DELETE", "/api/projects/" + id).then(function () { if (A.currentProject === id) { A.currentProject = (A.projects.find(function (p) { return p.id !== id; }) || {}).id || null; } goHome(A.currentProject); });
+    }; });
+  }
+
+  /* ------------------------------------------------------------------ composer */
+  function composerHtml(home) {
+    var running = !home && A.cstate.running, paused = !home && A.cstate.paused;
+    var ph = home ? "Ask nano-agent to change, fix or explain something…" : paused ? "Add a note for the agent, then send to resume…" : running ? "Send a note. The agent reads it before its next step…" : "Reply…";
+    var projSel = home ? '<select class="proj-select" id="proj-select" aria-label="Project">' + (A.projects.length ? A.projects.map(function (p) { return '<option value="' + p.id + '"' + (p.id === A.currentProject ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") : '<option value="">No project yet</option>') + '<option value="__import">Import a folder…</option></select>'
+      : '<span class="chip" title="' + esc(A.project ? A.project.path : "") + '">' + I.folder + esc(A.project ? A.project.name : "") + "</span>";
+    return '<div class="composer tile' + (home ? " glow-br" : "") + (running ? " note-mode" : "") + '">' +
+      '<textarea id="composer-text" rows="' + (home ? 3 : 2) + '" placeholder="' + esc(ph) + '" aria-label="Message">' + esc(A.text) + "</textarea>" +
+      '<div class="composer-bar">' + projSel +
+      sw("plan-first", A.planFirst, "Plan first", "", "", true) +
+      '<div class="seg" role="radiogroup" aria-label="Ask before"><button type="button" role="radio" data-preset="risky" aria-checked="' + (A.preset === "risky") + '">Risky steps</button><button type="button" role="radio" data-preset="every" aria-checked="' + (A.preset === "every") + '">Every change</button>' +
+      (A.preset === "custom" ? '<button type="button" role="radio" aria-checked="true" disabled>Custom</button>' : "") + "</div>" +
+      '<button type="button" class="icon-btn" id="open-drawer" title="Permissions" aria-label="Permissions">' + I.sliders + "</button>" +
+      '<span class="spacer"></span><button type="button" class="send" id="send" aria-label="' + (paused ? "Send and resume" : running ? "Send note" : "Send") + '"' + (A.connected ? "" : " disabled") + ">" + I.send + "</button></div></div>";
+  }
+
+  /* ------------------------------------------------------------------ main views */
+  function homeHtml() {
+    var recent = [];
+    A.projects.forEach(function (p) { p.chats.forEach(function (c) { recent.push(Object.assign({ project: p.name }, c)); }); });
+    recent.sort(function (a, b) { return (b.updated || 0) - (a.updated || 0); });
+    var h = '<div class="home"><div class="home-inner">' +
+      '<button type="button" class="icon-btn menu-btn" id="side-open" aria-label="Open sidebar">' + I.menu + "</button>" +
+      '<div class="hello"><h1>What should we work on?</h1><p>The agent works in your project folder. Risky steps wait for you, and every change can be undone.</p></div>';
+    if (!A.projects.length) {
+      h += '<div class="empty-card tile glow-tl"><h2 style="font-weight:400;font-size:20px">Start with a project</h2><p class="kbd">Import an existing folder, or create a new one. Your files stay where they are.</p>' +
+        '<div class="row"><button type="button" class="btn btn-primary" id="empty-import">' + I.folderPlus + "Import a folder</button></div></div>";
+    }
+    h += composerHtml(true) +
+      '<div class="suggest">' + SUGGEST.map(function (s) { return '<button type="button" class="chip" data-suggest="' + esc(s) + '">' + esc(s) + "</button>"; }).join("") + "</div>";
+    if (recent.length) {
+      h += '<div class="section-h">Recent chats</div><div class="recent">' + recent.slice(0, 6).map(function (c) {
+        return '<button type="button" class="recent-card tile" data-chat="' + c.id + '"><span class="tt">' + (c.running ? '<span class="dot' + (c.waiting ? " wait" : "") + '" style="display:inline-block;margin-right:8px"></span>' : "") + esc(c.title || "New chat") + "</span><small>" + esc(c.project) + " · " + ago(c.updated) + "</small></button>";
+      }).join("") + "</div>";
+    }
+    return h + "</div></div>";
+  }
+
+  function stepHtml(s) {
+    var st = STATUS[s.status] || STATUS.running;
+    var ico = s.status === "running" ? '<span class="spin">◐</span>' : st[0];
+    var h = '<div class="step s-' + esc(s.status) + '"><div class="step-row"><span class="ico" aria-hidden="true">' + ico + '</span><span class="st" title="' + esc(stepTitle(s)) + '">' + esc(stepTitle(s)) + "</span>" +
+      '<span class="meta">' + tag(s.tag) + "<span>" + st[1] + "</span></span>" +
+      (s.undoable ? '<button type="button" class="btn-undo" data-undo="' + s.id + '">Undo</button>' : "") + "</div>";
+    if (s.result && s.status !== "waiting") h += '<details data-open="' + s.id + '"' + (A.open[s.id] ? " open" : "") + "><summary>Show output</summary><pre>" + esc(s.result) + "</pre></details>";
+    if (s.status === "waiting" && s.approval) h += cardHtml(s);
+    return h + "</div>";
+  }
+
+  function cardHtml(s) {
+    var a = s.approval || {}, risky = s.permanent || (a.used_by && a.used_by.length);
+    var h = '<div class="card tile ' + (risky ? "glow-pink" : "glow-br") + '"><div class="card-head"><span class="lbl">Needs your approval</span><span class="row">' + tag(s.tag) + (s.may_undo ? '<span class="tag tag-undo">↶ Undoable</span>' : "") + "</span></div>";
+    if (s.reason) h += '<p class="why"><b>Why:</b> ' + esc(s.reason) + "</p>";
+    if (a.used_by && a.used_by.length) h += '<div class="warn"><b>⚠ Still used by</b>' + a.used_by.map(function (u) { return "<code>" + esc(u) + "</code>"; }).join("") + "</div>";
+    if (a.note) h += '<div class="warn"><b>⚠ ' + esc(a.note) + "</b></div>";
+    if (a.diff && a.diff.length) h += '<div class="diff" role="table" aria-label="Changes">' + a.diff.map(function (d) {
+      var cls = d[0] === "-" ? "del" : d[0] === "+" ? "add" : d[0] === "@" ? "hunk" : "", lbl = d[0] === "-" ? "Removed" : d[0] === "+" ? "Added" : "";
+      return '<div class="' + cls + '" role="row"><span class="lbl">' + lbl + '</span><span class="code">' + esc(d[1]) + "</span></div>";
+    }).join("") + "</div>";
+    if (a.what) h += '<p class="what">' + esc(a.what) + "</p>";
+    if (!risky && ["edit", "secret", "install", "command"].indexOf(s.risk) !== -1) {
+      var noun = { edit: "edits", secret: "config edits", install: "installs", command: "commands" }[s.risk];
+      h += sw("allow-" + s.id, false, "Don’t ask again for " + noun + " in this task", "");
+    }
+    var approve = '<button type="button" class="btn ' + (risky ? "btn-secondary" : "btn-primary") + '" data-decide="approve" data-id="' + s.id + '">' + (s.permanent ? "Do it anyway" : "Approve") + "</button>";
+    var skip = '<button type="button" class="btn ' + (risky ? "btn-primary" : "btn-secondary") + '" data-decide="skip" data-id="' + s.id + '">Skip</button>';
+    return h + '<div class="row">' + (risky ? skip + approve : approve + skip) + '<span class="kbd">A approve · S skip</span></div></div>';
+  }
+
+  function planHtml(p) {
+    var steps = p.steps || [];
+    var h = '<div class="card tile glow-tl"><div class="card-head"><span class="lbl">Plan</span>' +
+      (p.status === "pending" ? '<span class="badge wait">Waiting for you</span>' : p.status === "approved" ? '<span class="badge ok">Approved</span>' : p.status === "stopped" ? '<span class="badge no">Stopped</span>' : '<span class="badge no">Rejected</span>') + "</div>";
+    if (p.text) h += '<div class="msg-agent">' + md(p.text) + "</div>";
+    h += '<ol class="plan-list">' + steps.map(function (s, i) {
+      return '<li><span class="n">' + (i + 1) + '</span><div><div class="pt">' + esc(s.action || "") + (s.target ? ' <span class="mono kbd">' + esc(s.target) + "</span>" : "") + "</div>" + (s.why ? '<div class="pw">' + esc(s.why) + "</div>" : "") + "</div></li>";
+    }).join("") + "</ol>";
+    if (p.note) h += '<p class="kbd">Your note: ' + esc(p.note) + "</p>";
+    if (p.status === "pending") {
+      h += '<textarea id="plan-note" rows="2" placeholder="Anything to add? (optional)" aria-label="Note for the plan"></textarea>' +
+        '<div class="row"><button type="button" class="btn btn-primary" data-plan="approve">Approve plan</button><button type="button" class="btn btn-secondary" data-plan="reject">Reject</button><span class="kbd">Risky steps will still ask as they come up.</span></div>';
+    }
+    return h + "</div>";
+  }
+
+  function summaryHtml(s) {
+    var c = s.counts || {}, changes = s.changes || [];
+    var firstUndo = A.items.filter(function (x) { return x.kind === "step" && x.undoable; });
+    var turnFirst = A.items.find(function (x) { return x.kind === "step" && x.undoable && A.items.indexOf(x) > A.items.findIndex(function (y) { return y.kind === "user" && A.items.indexOf(y) < A.items.indexOf(s); }); });
+    return '<div class="card tile summary"><div class="card-head"><span class="lbl">This turn</span><span class="row">' +
+      '<span class="badge ok">' + (c.done || 0) + " done</span>" + (c.skipped ? '<span class="badge wait">' + c.skipped + " skipped</span>" : "") + (c.failed ? '<span class="badge no">' + c.failed + " failed</span>" : "") + (c.blocked ? '<span class="badge no">' + c.blocked + " blocked</span>" : "") + "</span></div>" +
+      (changes.length ? "<div><b>Files changed</b><ul>" + changes.map(function (x) { return "<li>" + esc(x.status) + ': <span class="mono">' + esc(x.path) + "</span></li>"; }).join("") + "</ul></div>" : '<p class="kbd">No files changed.</p>') +
+      (turnFirst && firstUndo.length ? '<div class="row"><button type="button" class="btn btn-secondary" data-goback="' + turnFirst.id + '">Undo all changes from this turn</button></div>' : "") + "</div>";
+  }
+
+  function chatHtml() {
+    var cs = A.cstate || {}, running = cs.running;
+    var st = cs.waiting || cs.plan_pending ? "Waiting for you" : cs.paused ? "Paused" : cs.pausing ? "Pausing…" : running ? "Working" : "Idle";
+    var cls = st === "Waiting for you" || st === "Paused" ? " wait" : running ? " ok" : "";
+    var title = A.renaming ? '<input class="input" id="rename" value="' + esc(A.chat ? A.chat.title : "") + '" aria-label="Chat title">'
+      : "<strong>" + esc(A.chat ? A.chat.title : "") + '</strong><small title="' + esc(A.project ? A.project.path : "") + '">' + esc(A.project ? A.project.path : "") + "</small>";
+    var h = '<div class="chat"><header class="chat-head tile"><button type="button" class="icon-btn menu-btn" id="side-open" aria-label="Open sidebar">' + I.menu + "</button>" +
+      '<div class="title">' + title + "</div>" +
+      (A.chatId && !A.renaming ? '<button type="button" class="icon-btn" id="rename-btn" title="Rename" aria-label="Rename chat">' + I.edit + "</button>" : "") +
+      '<span class="status' + cls + '" aria-live="polite">' + st + "</span>" +
+      '<button type="button" class="btn btn-primary" id="pause"' + (running && !cs.pausing && !cs.waiting && !cs.plan_pending ? "" : " disabled") + ">" + (cs.paused ? "Resume" : "Pause") + "</button>" +
+      '<button type="button" class="btn btn-danger" id="stop"' + (running ? "" : " disabled") + ">Stop</button></header>" +
+      '<div class="stream" id="stream"><div class="stream-inner">';
+    A.items.forEach(function (it) {
+      if (it.kind === "user") h += '<div class="msg-user">' + esc(it.text) + "</div>";
+      else if (it.kind === "agent") h += '<div class="msg-agent">' + md(it.text) + "</div>";
+      else if (it.kind === "step") h += stepHtml(it);
+      else if (it.kind === "plan") h += planHtml(it);
+      else if (it.kind === "note") h += '<div class="note ' + esc(it.who) + '">' + (it.who === "user" ? "<b>Your note:</b> " : "") + esc(it.text) + "</div>";
+      else if (it.kind === "summary") h += summaryHtml(it);
+      else if (it.kind === "error") h += '<div class="err">' + esc(it.text) + "</div>";
+    });
+    if (running && !cs.waiting && !cs.plan_pending) {
+      if (cs.paused) h += '<div class="card tile glow-tl"><div class="card-head"><span class="lbl">Paused</span></div><p>Nothing runs while paused. Undo a step, type a note below, or resume.</p><div class="row"><button type="button" class="btn btn-primary" id="resume">Resume</button><button type="button" class="btn btn-danger" id="stop2">Stop task</button></div></div>';
+      else h += '<div class="thought"><span class="spin">◐</span>' + esc(cs.pausing ? "Pausing after this step…" : A.thinking || "Working…") + "</div>";
+    }
+    return h + '</div></div><div style="width:min(860px,100%);margin:0 auto">' + composerHtml(false) + "</div></div>";
+  }
+
+  /* ------------------------------------------------------------------ drawer */
+  function renderDrawer() {
+    var d = $("#drawer"); d.hidden = !A.drawer; $("#shell").classList.toggle("drawer-open", A.drawer);
+    if (!A.drawer) { d.innerHTML = ""; return; }
+    var locked = A.info ? A.info.locked : [];
+    d.innerHTML = '<div class="drawer-h"><h2>Permissions</h2><button type="button" class="icon-btn" id="close-drawer" aria-label="Close">' + I.x + "</button></div>" +
+      '<div class="group"><span class="lbl">Ask me before it…</span><div><div class="seg" role="radiogroup" aria-label="Ask before"><button type="button" role="radio" data-preset="risky" aria-checked="' + (A.preset === "risky") + '">Risky steps</button><button type="button" role="radio" data-preset="every" aria-checked="' + (A.preset === "every") + '">Every change</button></div></div>' +
+      SETTINGS.map(function (s) { return sw("set-" + s.key, A.settings[s.key], s.label, s.note, (locked.indexOf(s.key) !== -1 ? ' disabled title="Always asks"' : "") + ' data-setting="' + s.key + '"'); }).join("") +
+      '<p class="foot-note">Defaults follow what most of our survey respondents chose (n = 12). Reading files never asks.</p></div>' +
+      '<div class="group"><span class="lbl">Files it may touch</span><div><div class="seg" role="radiogroup" aria-label="Files it may touch"><button type="button" role="radio" data-scope="all" aria-checked="' + (A.scopeMode === "all") + '">Whole folder</button><button type="button" role="radio" data-scope="chosen" aria-checked="' + (A.scopeMode === "chosen") + '">Only these</button></div></div>' +
+      (A.scopeMode === "chosen" ? '<div class="chips">' + A.entries.map(function (f, j) { var on = A.scopeFiles.indexOf(f) !== -1; return '<label class="chip' + (on ? " on" : "") + '"><input type="checkbox" data-file="' + esc(f) + '"' + (on ? " checked" : "") + ">" + esc(f) + "</label>"; }).join("") + "</div>" : "") +
+      '<p class="foot-note">Applies to your next message in ' + esc((projectById(A.currentProject) || {}).name || "this project") + ".</p></div>" +
+      '<div class="group"><span class="lbl">Notifications</span>' + sw("sound", A.sound, "Sound when it needs me", "A notification always shows") + "</div>";
+    $("#close-drawer").onclick = function () { A.drawer = false; render(); };
+    wireCommon(d);
+    d.querySelectorAll("[data-scope]").forEach(function (b) { b.onclick = function () { A.scopeMode = b.getAttribute("data-scope"); renderDrawer(); }; });
+    d.querySelectorAll("[data-file]").forEach(function (c) { c.onchange = function () { var f = c.getAttribute("data-file"); A.scopeFiles = A.scopeFiles.filter(function (x) { return x !== f; }); if (c.checked) A.scopeFiles.push(f); renderDrawer(); }; });
+    var snd = $("#sound"); if (snd) snd.onclick = function () { A.sound = !A.sound; save("sound", A.sound); primeAudio(); renderDrawer(); };
+  }
+
+  /* ------------------------------------------------------------------ render + wiring */
+  function renderMain() {
+    var main = $("#main");
+    var box = $("#composer-text"), focused = document.activeElement === box, caret = box ? box.selectionStart : 0;
+    var pn = $("#plan-note"), planNote = pn ? pn.value : "";
+    var allows = {}; main.querySelectorAll('[id^="allow-"]').forEach(function (b) { allows[b.id] = b.getAttribute("aria-checked"); });
+    var s = $("#stream"), atBottom = !s || s.scrollTop + s.clientHeight >= s.scrollHeight - 120, prevTop = s ? s.scrollTop : 0;
+
+    main.innerHTML = A.view === "home" ? homeHtml() : chatHtml();
+
+    var nb = $("#composer-text"); if (nb) { nb.value = A.text; if (focused) { nb.focus(); nb.setSelectionRange(caret, caret); } }
+    var npn = $("#plan-note"); if (npn && planNote) npn.value = planNote;
+    Object.keys(allows).forEach(function (id) { var b = document.getElementById(id); if (b) b.setAttribute("aria-checked", allows[id]); });
+    var ns = $("#stream"); if (ns) ns.scrollTop = atBottom ? ns.scrollHeight : prevTop;
+    wireMain(main);
+  }
+  function render() { renderSidebar(); renderMain(); renderDrawer(); }
+
+  function wireCommon(root) {
+    root.querySelectorAll("[data-preset]").forEach(function (b) { b.onclick = function () { setPreset(b.getAttribute("data-preset")); }; });
+    root.querySelectorAll("[data-setting]").forEach(function (b) { b.onclick = function () { toggleSetting(b.getAttribute("data-setting")); }; });
+  }
+  function wireMain(root) {
+    wireCommon(root);
+    var t = $("#composer-text");
+    if (t) {
+      t.oninput = function () { A.text = t.value; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 240) + "px"; };
+      t.onkeydown = function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } };
+    }
+    var on = function (id, fn) { var el = document.getElementById(id); if (el) el.onclick = fn; };
+    on("send", submit);
+    on("open-drawer", function () { A.drawer = !A.drawer; render(); });
+    on("side-open", function () { A.sidebarOpen = true; renderSidebar(); });
+    on("empty-import", function () { openImport(); });
+    on("plan-first", function () { A.planFirst = !A.planFirst; save("planFirst", A.planFirst); renderMain(); });
+    on("pause", function () { if (A.cstate.paused) send({ type: "resume", chat_id: A.chatId }); else send({ type: "pause", chat_id: A.chatId }); });
+    on("resume", function () { send({ type: "resume", chat_id: A.chatId }); });
+    on("stop", function () { send({ type: "stop", chat_id: A.chatId }); });
+    on("stop2", function () { send({ type: "stop", chat_id: A.chatId }); });
+    on("rename-btn", function () { A.renaming = true; renderMain(); var r = $("#rename"); r.focus(); r.select(); });
+    var r = $("#rename");
+    if (r) {
+      var done = function (ok) { var v = r.value.trim(); A.renaming = false; if (ok && v) { A.chat.title = v; api("PATCH", "/api/chats/" + A.chatId, { title: v }); } renderMain(); };
+      r.onkeydown = function (e) { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); };
+      r.onblur = function () { if (A.renaming) done(true); };
+    }
+    var ps = $("#proj-select");
+    if (ps) ps.onchange = function () { if (ps.value === "__import") { ps.value = A.currentProject || ""; openImport(); return; } A.currentProject = ps.value; save("lastProject", ps.value); loadEntries(); render(); };
+    root.querySelectorAll("[data-suggest]").forEach(function (b) { b.onclick = function () { A.text = b.getAttribute("data-suggest") + (/ (in|for)$/.test(b.getAttribute("data-suggest")) ? " " : ""); renderMain(); var x = $("#composer-text"); x.focus(); x.setSelectionRange(x.value.length, x.value.length); }; });
+    root.querySelectorAll("[data-chat]").forEach(function (b) { b.onclick = function () { openChat(b.getAttribute("data-chat")); }; });
+    root.querySelectorAll("[data-decide]").forEach(function (b) { b.onclick = function () { decide(b.getAttribute("data-id"), b.getAttribute("data-decide")); }; });
+    root.querySelectorAll('[id^="allow-"]').forEach(function (b) { b.onclick = function () { b.setAttribute("aria-checked", b.getAttribute("aria-checked") === "true" ? "false" : "true"); }; });
+    root.querySelectorAll("[data-plan]").forEach(function (b) { b.onclick = function () { var n = $("#plan-note"); send({ type: "plan_decision", chat_id: A.chatId, approve: b.getAttribute("data-plan") === "approve", note: n ? n.value.trim() : "" }); }; });
+    root.querySelectorAll("[data-undo]").forEach(function (b) { b.onclick = function () {
+      if (A.cstate.running && !A.cstate.paused && !A.cstate.waiting && !A.cstate.plan_pending) { send({ type: "pause", chat_id: A.chatId }); toast("<b>Pausing first</b>Press Undo again once the agent has paused."); return; }
+      send({ type: "undo", chat_id: A.chatId, item_id: b.getAttribute("data-undo") });
+    }; });
+    root.querySelectorAll("[data-goback]").forEach(function (b) { b.onclick = function () { send({ type: "undo", chat_id: A.chatId, item_id: b.getAttribute("data-goback"), go_back: true }); }; });
+    root.querySelectorAll("details[data-open]").forEach(function (d) { d.ontoggle = function () { A.open[d.getAttribute("data-open")] = d.open; }; });
+  }
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { if (A.modal) { A.modal = null; renderModal(); return; } if (A.drawer) { A.drawer = false; render(); return; } }
+    var tagName = (e.target && e.target.tagName) || "";
+    if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
+    var waiting = A.view === "chat" && A.cstate.waiting, k = e.key.toLowerCase();
+    if (waiting && k === "a") { e.preventDefault(); decide(A.cstate.waiting, "approve"); }
+    else if (waiting && k === "s") { e.preventDefault(); decide(A.cstate.waiting, "skip"); }
+    else if (k === "p" && A.view === "chat" && A.cstate.running) { e.preventDefault(); send({ type: A.cstate.paused ? "resume" : "pause", chat_id: A.chatId }); }
+  });
+  window.addEventListener("hashchange", function () { var m = location.hash.match(/^#chat-([0-9a-f]+)$/); if (m && m[1] !== A.chatId) openChat(m[1]); });
+
+  /* ------------------------------------------------------------------ boot */
+  api("GET", "/api/state").then(function (d) {
+    A.info = d; A.projects = d.projects; A.settings = defaults();
+    var last = load("lastProject", null);
+    A.currentProject = projectById(last) ? last : (d.projects[0] || {}).id || null;
+    var m = location.hash.match(/^#chat-([0-9a-f]+)$/);
+    if (m) openChat(m[1]); else { loadEntries(); render(); }
+    connect();
+  }).catch(function () { $("#main").innerHTML = '<div class="home"><div class="err">The nano-agent server isn’t running. Start it with <code>uv run nano-agent-console</code>.</div></div>'; });
+})();
+</script>
+</body>
+</html>

@@ -20,7 +20,8 @@ def tmp_config(tmp_path):
 class TestAgentConfig:
     def test_defaults(self):
         config = AgentConfig()
-        assert config.model == "claude-sonnet-4-6"
+        assert config.provider == "gemini"
+        assert config.model == "gemini-3.7-flash"
         assert config.max_tokens == 16000
         assert config.max_turns == 20
         assert config.thinking_mode == "adaptive"
@@ -31,12 +32,21 @@ class TestAgentConfig:
         config = AgentConfig(skip_approval=True)
         assert config.skip_approval is True
 
+    def test_anthropic_default_model(self):
+        config = AgentConfig(provider="anthropic")
+        assert config.model == "claude-sonnet-4-6"
+
+    def test_unknown_provider_rejected(self):
+        with pytest.raises(ValueError, match="provider must be one of"):
+            AgentConfig(provider="other").validate()
+
 
 class TestLoadConfig:
     def test_no_config_returns_defaults(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         config = load_config()
-        assert config.model == "claude-sonnet-4-6"
+        assert config.provider == "gemini"
+        assert config.model == "gemini-3.7-flash"
 
     def test_explicit_path(self, tmp_config):
         path = tmp_config("model: claude-opus-4-6\nmax_tokens: 32000\n")
@@ -76,8 +86,14 @@ skip_approval: true
     def test_empty_config(self, tmp_config):
         path = tmp_config("")
         config = _parse_config(path)
-        assert config.model == "claude-sonnet-4-6"
+        assert config.model == "gemini-3.7-flash"
         assert config.skip_approval is False
+
+    def test_provider_from_file(self, tmp_config):
+        path = tmp_config("provider: anthropic\n")
+        config = _parse_config(path)
+        assert config.provider == "anthropic"
+        assert config.model == "claude-sonnet-4-6"
 
     def test_skip_approval_defaults_false(self, tmp_config):
         path = tmp_config("model: claude-sonnet-4-6\n")

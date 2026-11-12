@@ -1,5 +1,7 @@
 """Tool registry."""
 
+from nano_agent.tools.delete_file import SCHEMA as DELETE_FILE_SCHEMA
+from nano_agent.tools.delete_file import delete_file
 from nano_agent.tools.edit_file import SCHEMA as EDIT_FILE_SCHEMA
 from nano_agent.tools.edit_file import edit_file
 from nano_agent.tools.find_files import SCHEMA as FIND_FILES_SCHEMA
@@ -47,3 +49,14 @@ def get_tools() -> dict:
             "schema": SPAWN_AGENT_SCHEMA,
         },
     }
+
+
+def get_console_tools() -> dict:
+    """Tools for the oversight console.
+
+    No spawn_agent: a child agent approves its own tools and its steps would not
+    reach the screen. Adds delete_file, which moves files to .trash/ so deletes can be undone.
+    """
+    tools = {k: v for k, v in get_tools().items() if k != "spawn_agent"}
+    tools["delete_file"] = {"function": delete_file, "schema": DELETE_FILE_SCHEMA}
+    return tools

@@ -10,10 +10,10 @@ from rich.table import Table
 
 from nano_agent import __version__
 from nano_agent.agent import Agent
-from nano_agent.config import AgentConfig, load_config
+from nano_agent.config import DEFAULT_MODELS, AgentConfig, load_config
 from nano_agent.events import EventBus
 from nano_agent.listeners import register_approval_listener, register_logging_listeners, register_ui_listeners
-from nano_agent.providers import AnthropicProvider
+from nano_agent.providers import make_provider
 from nano_agent.providers.base import ProviderError
 from nano_agent.tools import get_tools
 
@@ -26,6 +26,12 @@ def parse_args() -> argparse.Namespace:
         "--config",
         default=None,
         help="Path to YAML config file (default: auto-detect nano-agent.yml)",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=("gemini", "anthropic"),
+        default=None,
+        help="LLM provider (overrides config file)",
     )
     parser.add_argument(
         "--model",
@@ -64,6 +70,12 @@ def resolve_config(args: argparse.Namespace) -> AgentConfig:
     config = load_config(args.config)
 
     # CLI args and env vars override the config file
+    provider = getattr(args, "provider", None)
+    if provider and provider != config.provider:
+        if config.model == DEFAULT_MODELS.get(config.provider):
+            config.model = DEFAULT_MODELS[provider]
+        config.provider = provider
+
     if args.model:
         config.model = args.model
     elif env_model := os.environ.get("NANO_AGENT_MODEL"):
@@ -97,7 +109,7 @@ def print_splash(config: AgentConfig) -> None:
     info = Table.grid(padding=(0, 2))
     info.add_column()
     info.add_column(style="dim")
-    info.add_row("model", config.model)
+    info.add_row("model", f"{config.model} ({config.provider})")
     info.add_row("cwd", cwd)
 
     panel = Panel(
@@ -114,12 +126,7 @@ async def run() -> None:
     args = parse_args()
     config = resolve_config(args)
 
-    provider = AnthropicProvider(
-        model=config.model,
-        max_tokens=config.max_tokens,
-        thinking_mode=config.thinking_mode,
-        thinking_budget_tokens=config.thinking_budget_tokens,
-    )
+    provider = make_provider(config)
     event_bus = EventBus()
 
     register_ui_listeners(event_bus)

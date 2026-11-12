@@ -5,17 +5,22 @@ description = "A minimal coding agent for learning how to build AI agents"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.78.0",
+    "fastapi>=0.162.5",
+    "google-genai>=3.2.0",
     "pyyaml>=6.0",
     "rich>=13.0",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [project.scripts]
 nano-agent = "nano_agent.main:main"
+nano-agent-console = "nano_agent.server:main"
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
     "ipykernel>=7.1.0",
+    "httpx>=0.28.1",
 ]
 
 [build-system]

@@ -25,12 +25,13 @@ SCHEMA = {
 }
 
 
-async def run_bash(command: str, timeout: int = 30) -> str:
-    """Run a bash command and return combined stdout/stderr."""
+async def run_bash(command: str, timeout: int = 30, cwd: str | None = None) -> str:
+    """Run a bash command and return combined stdout/stderr. ``cwd`` is not exposed to the model."""
     process = await asyncio.create_subprocess_shell(
         command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        cwd=cwd,
     )
 
     try:

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "console-demo",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "--directory", "code", "nano-agent-console", "--demo", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}

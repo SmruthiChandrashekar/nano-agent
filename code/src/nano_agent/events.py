@@ -1,7 +1,7 @@
 """Event bus and lifecycle event types for the agent loop."""
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 
@@ -17,10 +17,16 @@ class Thinking:
 
 @dataclass
 class PreToolUse:
-    """Emitted before a tool is executed. Approval gate - listeners return True/False."""
+    """Emitted before a tool is executed. Approval gate - listeners return True/False.
+
+    ``tool_id`` matches the model's tool call. ``reason`` is the text the model
+    wrote alongside the call (why it wants to do this), if any.
+    """
 
     tool_name: str
     tool_params: dict
+    tool_id: str = ""
+    reason: str = ""
 
 
 @dataclass
@@ -29,6 +35,30 @@ class PostToolUse:
 
     tool_name: str
     result: str
+    tool_id: str = ""
+    tool_params: dict = field(default_factory=dict)
+
+
+@dataclass
+class PlanProposed:
+    """Emitted when the agent proposes a plan before acting. Approval gate for the plan."""
+
+    steps: list
+    text: str = ""
+
+
+@dataclass
+class Paused:
+    """Emitted when the loop reaches a safe point and stops because the user asked to pause."""
+
+    after_step: str = ""
+
+
+@dataclass
+class Resumed:
+    """Emitted when a paused loop continues."""
+
+    note: str = ""
 
 
 @dataclass
@@ -62,6 +92,7 @@ class EventBus:
     def __init__(self) -> None:
         self._listeners: dict[type, list[Callable]] = defaultdict(list)
         self._approval_handler: Callable | None = None
+        self._plan_handler: Callable | None = None
 
     def on(self, event_type: type, callback: Callable) -> None:
         """Register an async callback for an event type."""
@@ -91,3 +122,21 @@ class EventBus:
             return True
         result = await self._approval_handler(event)
         return result is not False
+
+    def on_plan(self, callback: Callable) -> None:
+        """Register the handler that approves or rejects a PlanProposed event.
+
+        The callback returns True/False, or a (approved, note) tuple.
+        """
+        self._plan_handler = callback
+
+    async def emit_plan(self, event: PlanProposed) -> tuple[bool, str]:
+        """Emit to regular listeners, then ask the plan handler. Approves if none is registered."""
+        await self.emit(event)
+        if self._plan_handler is None:
+            return True, ""
+        result = await self._plan_handler(event)
+        if isinstance(result, tuple):
+            approved, note = result
+            return approved is not False, note or ""
+        return result is not False, ""

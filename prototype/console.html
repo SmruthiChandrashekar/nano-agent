@@ -1,0 +1,954 @@
+<title>Agent Oversight Console</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one light look on purpose (matches the team's glass reference): warm off-white page, thick frosted tiles with soft mint/blush glows inside, pill controls. Prototype strip → hint → console tile (top bar · timeline · decision panel). Stacks on phones. */
+:root {
+  color-scheme: light;
+  --bg: #F4F1EC;
+  --ink: #2E3436;
+  --text: #3F4749;
+  --muted: #6A7375;
+  --mint-1: #93D3C6;
+  --mint-2: #69B6A8;
+  --mint-glow: rgba(138, 206, 192, .42);
+  --pink-glow: rgba(242, 188, 182, .50);
+  --pink-1: #F8DCD7;
+  --pink-2: #F0C6C0;
+  --tile-top: rgba(255, 255, 255, .78);
+  --tile-bottom: rgba(255, 255, 255, .46);
+  --rim: rgba(255, 255, 255, .96);
+  --edge: rgba(140, 152, 152, .30);
+  --track-off: rgba(212, 220, 219, .75);
+  --focus: #4E9F90;
+  --mint-bg: #DCEFEA;  --mint-ink: #2C6A5E;
+  --amber-bg: #F5E8CE; --amber-ink: #6A4B12;
+  --gray-bg: #ECEEEE;  --gray-ink: #4A5254;
+  --pink-bg: #F7DDD9;  --pink-ink: #8A3A31;
+  --add-bg: rgba(160, 216, 196, .45); --del-bg: rgba(244, 196, 190, .55);
+  --font-ui: 'Inter', 'Helvetica Neue', 'Segoe UI', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+}
+* { box-sizing: border-box; }
+html { min-height: 100%; background: var(--bg); }
+body {
+  min-height: 100%;
+  background: radial-gradient(70% 50% at 50% 0%, rgba(255, 255, 255, .7), transparent 70%), var(--bg);
+  color: var(--text); font-family: var(--font-ui); font-weight: 400; font-size: 15px; line-height: 1.5; letter-spacing: -.005em;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; color: var(--ink); }
+p { margin: 0; }
+b { font-weight: 500; color: var(--ink); }
+button { font: inherit; cursor: pointer; color: inherit; letter-spacing: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible, .chip:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); }
+
+/* thick frosted tile */
+.tile {
+  position: relative; border-radius: 30px;
+  background: linear-gradient(180deg, var(--tile-top), var(--tile-bottom));
+  -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%);
+  border: 1.5px solid var(--rim);
+  box-shadow: 0 0 0 1px var(--edge), 0 14px 34px rgba(70, 90, 90, .10), inset 0 2px 0 rgba(255, 255, 255, .95), inset 0 -3px 8px rgba(150, 170, 170, .12);
+}
+.glow-br { background: radial-gradient(55% 50% at 78% 80%, var(--mint-glow), transparent 72%), linear-gradient(180deg, var(--tile-top), var(--tile-bottom)); }
+.glow-c { background: radial-gradient(55% 55% at 50% 55%, var(--mint-glow), transparent 72%), linear-gradient(180deg, var(--tile-top), var(--tile-bottom)); }
+.glow-tl { background: radial-gradient(50% 45% at 22% 30%, var(--mint-glow), transparent 72%), linear-gradient(180deg, var(--tile-top), var(--tile-bottom)); }
+.glow-pink { background: radial-gradient(60% 55% at 70% 65%, var(--pink-glow), transparent 75%), linear-gradient(180deg, rgba(255, 246, 244, .80), rgba(252, 232, 229, .55)); }
+.sub { border-radius: 22px; }
+
+/* pill surface */
+.pill-surface, .btn-secondary, .chip, .switch-pill, .seg, .tabs, .btn-undo, .fact, textarea, input[type="text"] {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(246, 248, 247, .82));
+  border: 1px solid #FFFFFF;
+  box-shadow: 0 0 0 1px var(--edge), 0 4px 12px rgba(70, 90, 90, .08), inset 0 1px 0 #FFFFFF;
+}
+
+/* segmented control (mint selection) */
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 5px; border-radius: 999px; }
+.seg button { border: 0; background: transparent; padding: 8px 20px; border-radius: 999px; font-size: 15px; color: var(--muted); }
+.seg button[aria-checked="true"] {
+  background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #FFFFFF; font-weight: 500;
+  text-shadow: 0 1px 1px rgba(30, 90, 80, .35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 4px 12px rgba(80, 160, 145, .35);
+}
+.seg button:disabled { cursor: default; }
+
+/* tabs (white raised selection) */
+.tabs { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 5px; border-radius: 999px; }
+.tabs button { border: 0; background: transparent; padding: 7px 16px; border-radius: 999px; font-size: 14px; color: var(--muted); }
+.tabs button[aria-pressed="true"] { background: #FFFFFF; color: var(--ink); font-weight: 500; box-shadow: 0 0 0 1px var(--edge), 0 3px 10px rgba(70, 90, 90, .12), inset 0 0 0 1px rgba(138, 206, 192, .45); }
+
+/* pill switch: label and knob in one pill */
+.switch-pill { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; padding: 7px 7px 7px 18px; border-radius: 999px; text-align: left; }
+.switch-pill .sp-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.switch-pill .sp-text b { font-weight: 400; font-size: 15px; color: var(--ink); }
+.switch-pill .sp-text small { color: var(--muted); font-size: 12px; }
+.switch-pill .track { position: relative; flex: none; width: 56px; height: 32px; border-radius: 999px; background: var(--track-off); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .10); transition: background .2s; }
+.switch-pill .knob { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 6px rgba(40, 60, 60, .25), inset 0 -1px 2px rgba(0, 0, 0, .05); transition: transform .2s; }
+.switch-pill[aria-checked="true"] .track { background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); }
+.switch-pill[aria-checked="true"] .knob { transform: translateX(24px); }
+.switch-pill:disabled { cursor: not-allowed; opacity: .7; }
+.switch-pill.compact { width: auto; padding: 4px 4px 4px 14px; gap: 10px; }
+.switch-pill.compact .track { width: 46px; height: 26px; }
+.switch-pill.compact .knob { width: 20px; height: 20px; }
+.switch-pill.compact[aria-checked="true"] .knob { transform: translateX(20px); }
+
+/* prototype strip */
+.proto { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; justify-content: space-between; padding: 12px 16px 12px 22px; }
+.proto-name { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.proto-name b { font-size: 18px; font-weight: 400; }
+.proto-name span { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.proto-ctrls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.hint { padding: 12px 20px; font-size: 14px; color: var(--muted); border-radius: 22px; }
+.hint b { color: var(--ink); }
+
+/* console */
+.app { overflow: hidden; }
+.topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 16px 20px; border-bottom: 1px solid rgba(140, 152, 152, .18); }
+.topbar .task { display: flex; flex-direction: column; min-width: 0; }
+.topbar .task small { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.topbar .task strong { font-weight: 400; font-size: 17px; color: var(--ink); overflow-wrap: anywhere; }
+.top-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.status { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; background: var(--gray-bg); color: var(--gray-ink); }
+.status.wait { background: var(--amber-bg); color: var(--amber-ink); }
+.status.ok { background: var(--mint-bg); color: var(--mint-ink); }
+.btn-pause, .btn-stop { border-radius: 999px; padding: 9px 20px; font-size: 14px; font-weight: 500; }
+.btn-pause { border: 1px solid rgba(255, 255, 255, .7); background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #FFFFFF; text-shadow: 0 1px 1px rgba(30, 90, 80, .35); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 4px 12px rgba(80, 160, 145, .30); }
+.btn-stop { border: 1px solid #FFFFFF; background: linear-gradient(180deg, var(--pink-1), var(--pink-2)); color: var(--pink-ink); box-shadow: 0 0 0 1px rgba(200, 150, 145, .35), 0 4px 12px rgba(200, 120, 110, .18), inset 0 1px 0 rgba(255, 255, 255, .8); }
+.btn-pause[disabled], .btn-stop[disabled] { opacity: .45; cursor: not-allowed; box-shadow: none; }
+
+.body { display: grid; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .body { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); } }
+.col { padding: 22px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.col + .col { border-top: 1px solid rgba(140, 152, 152, .18); }
+@media (min-width: 900px) { .col + .col { border-top: 0; border-left: 1px solid rgba(140, 152, 152, .18); } }
+.col-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.col-h h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.col-h span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* timeline */
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.step { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 14px; }
+.step .ico { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 500; font-size: 14px; background: var(--gray-bg); color: var(--gray-ink); box-shadow: inset 0 1px 0 #FFFFFF; }
+.step.s-done .ico { background: var(--mint-bg); color: var(--mint-ink); }
+.step.s-running .ico { background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #FFFFFF; }
+.step.s-waiting { box-shadow: 0 0 0 2px #E2C68E, 0 14px 34px rgba(70, 90, 90, .10), inset 0 2px 0 rgba(255, 255, 255, .95); }
+.step.s-waiting .ico { background: var(--amber-bg); color: var(--amber-ink); }
+.step.s-failed .ico, .step.s-blocked .ico { background: var(--pink-bg); color: var(--pink-ink); }
+.step.s-queued, .step.s-notrun, .step.s-removed { opacity: .72; }
+.step .t { font-weight: 400; color: var(--ink); overflow-wrap: anywhere; }
+.step .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; font-size: 13px; color: var(--muted); }
+.step .res { margin-top: 5px; font-size: 12.5px; color: var(--muted); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.step.s-failed .res { color: var(--pink-ink); }
+.step.s-undone .t, .step.s-removed .t { text-decoration: line-through; }
+.btn-undo { border-radius: 999px; padding: 5px 14px; font-size: 13px; color: var(--ink); }
+.note { padding: 10px 16px; border-radius: 20px; font-size: 14px; }
+.note.user { background: var(--amber-bg); color: var(--amber-ink); }
+.note.agent { background: var(--mint-bg); color: var(--mint-ink); }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } .switch-pill .track, .switch-pill .knob { transition: none; } }
+
+/* tags */
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .8); }
+.tag-auto, .tag-allowed { background: var(--mint-bg); color: var(--mint-ink); }
+.tag-ask { background: var(--amber-bg); color: var(--amber-ink); }
+.tag-choice, .tag-blocked { background: var(--gray-bg); color: var(--gray-ink); }
+.tag-perm { background: var(--pink-bg); color: var(--pink-ink); }
+
+/* panels */
+.panel-title { font-size: 26px; font-weight: 400; letter-spacing: -.015em; color: var(--ink); }
+.panel-sub { color: var(--muted); }
+.group { display: flex; flex-direction: column; gap: 10px; }
+.group > .lbl { font-size: 14px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; font-family: var(--font-mono); font-size: 13px; color: var(--text); cursor: pointer; }
+.chip.on { background: linear-gradient(180deg, #E9F6F2, #D6EEE8); color: var(--mint-ink); }
+.chip input { accent-color: var(--mint-2); }
+.switch-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+.foot-note { font-size: 12px; color: var(--muted); }
+textarea, input[type="text"] { font: inherit; width: 100%; border-radius: 20px; padding: 12px 16px; color: var(--ink); }
+textarea { resize: vertical; min-height: 66px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { border-radius: 999px; padding: 10px 22px; font-size: 15px; font-weight: 400; }
+.btn-primary { border: 1px solid rgba(255, 255, 255, .7); background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #FFFFFF; font-weight: 500; text-shadow: 0 1px 1px rgba(30, 90, 80, .35); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 6px 16px rgba(80, 160, 145, .32); }
+.btn-secondary { color: var(--ink); }
+.btn-danger { border: 1px solid #FFFFFF; background: linear-gradient(180deg, var(--pink-1), var(--pink-2)); color: var(--pink-ink); font-weight: 500; box-shadow: 0 0 0 1px rgba(200, 150, 145, .35), 0 4px 12px rgba(200, 120, 110, .18), inset 0 1px 0 rgba(255, 255, 255, .8); }
+.btn-quiet { border: 0; background: transparent; color: var(--muted); }
+.kbd { font-size: 12px; color: var(--muted); }
+.plan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.plan-list li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px 16px; }
+.plan-list li.removed { opacity: .5; }
+.plan-list li.removed .pt { text-decoration: line-through; }
+.plan-list .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.plan-list .pt { color: var(--ink); overflow-wrap: anywhere; }
+.plan-list .pw { font-size: 13px; color: var(--muted); }
+.plan-list .pm { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.linkbtn { border: 0; background: transparent; color: var(--muted); text-decoration: underline; font-size: 13px; padding: 2px 4px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.fact { border-radius: 999px; padding: 5px 14px; font-size: 13px; color: var(--muted); }
+
+.card { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.card-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.card h3 { font-family: var(--font-mono); font-weight: 500; font-size: 18px; overflow-wrap: anywhere; }
+.warn { background: var(--pink-bg); color: var(--pink-ink); border-radius: 18px; padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7); }
+.warn b { color: var(--pink-ink); }
+.warn code { font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
+.what { background: rgba(255, 255, 255, .6); border-radius: 18px; padding: 10px 16px; font-size: 14px; box-shadow: 0 0 0 1px var(--edge); }
+.diff { border-radius: 18px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; background: rgba(255, 255, 255, .7); box-shadow: 0 0 0 1px var(--edge); }
+.diff div { display: grid; grid-template-columns: 80px minmax(0, 1fr); white-space: pre; }
+.diff .lbl { padding: 3px 12px; color: var(--muted); font-family: var(--font-ui); font-size: 12px; }
+.diff .code { padding: 3px 12px; }
+.diff .add { background: var(--add-bg); }
+.diff .del { background: var(--del-bg); }
+
+.working { padding: 20px; display: flex; flex-direction: column; gap: 8px; min-height: 180px; }
+.sum-sec { padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; }
+.sum-sec h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.sum-sec ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.sum-sec li { overflow-wrap: anywhere; }
+.sum-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+.measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.measure { padding: 12px 16px; }
+.measure b { display: block; font-size: 19px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.measure span { font-size: 13px; color: var(--muted); }
+details.study { padding: 12px 18px; }
+details.study summary { cursor: pointer; color: var(--ink); }
+details.study .inner { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+details.study textarea { font-family: var(--font-mono); font-size: 12px; min-height: 140px; }
+
+/* log conditions (plain log / yes-no prompts) */
+.logview { margin: 18px; padding: 16px 20px; border-radius: 22px; background: rgba(255, 255, 255, .62); box-shadow: 0 0 0 1px var(--edge), inset 0 1px 0 #FFFFFF; color: var(--text); font-family: var(--font-mono); font-size: 13px; min-height: 300px; max-height: 440px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.logview .dim { color: var(--muted); }
+.prompt { margin: 0 18px 18px; padding: 10px 10px 10px 20px; border-radius: 999px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-size: 14px; color: var(--ink); }
+
+/* toast */
+.toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: min(380px, calc(100vw - 32px)); padding: 12px 12px 12px 18px; display: flex; gap: 12px; align-items: center; border-radius: 999px; z-index: 5; }
+.toast b { display: block; }
+.toast button { border: 1px solid rgba(255, 255, 255, .7); background: linear-gradient(180deg, var(--mint-1), var(--mint-2)); color: #FFFFFF; border-radius: 999px; padding: 8px 16px; font-weight: 500; white-space: nowrap; }
+.foot { font-size: 13px; color: var(--muted); padding: 0 6px; }
+</style>
+
+<div class="wrap">
+  <div class="proto tile">
+    <div class="proto-name"><b>Approve, Pause, Undo</b><span>Clickable prototype · scripted agent</span></div>
+    <div class="proto-ctrls">
+      <div class="tabs" role="group" aria-label="Condition">
+        <button id="cond-console" type="button" aria-pressed="true">Console</button>
+        <button id="cond-prompts" type="button" aria-pressed="false">Yes/No prompts</button>
+        <button id="cond-baseline" type="button" aria-pressed="false">Plain log</button>
+      </div>
+      <button type="button" class="switch-pill compact" role="switch" id="hints" aria-checked="true"><span class="sp-text"><b>Hints</b></span><span class="track"><span class="knob"></span></span></button>
+      <button id="restart" class="btn btn-secondary" type="button">Restart</button>
+    </div>
+  </div>
+  <p class="hint tile" id="hint" aria-live="polite"></p>
+  <main id="root"></main>
+  <p class="foot">Prototype for the HCI project “Oversight Controls for Autonomous AI Agents”. The agent is scripted so every run behaves the same; no real files change. Three conditions: our Console, Yes/No prompts (how today’s tools ask by default) and Plain log (approvals switched off). Defaults follow our survey (n = 12). Keys at a gate: A approve, S skip (Y / N in Yes/No prompts). P pauses.</p>
+</div>
+<div class="toast tile" id="toast" hidden role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- scripted agent ---------- */
+  var STEPS = [
+    { title: "List files in the project", tool: "list_directory", kind: "read", target: ".",
+      plan: "See what’s in the project", result: "main.py  utils.py  config_old.json  tests/" },
+    { title: "Read main.py", tool: "read_file", kind: "read", target: "main.py",
+      plan: "Check which files the code uses", result: "42 lines · line 3 loads config_old.json" },
+    { title: "Edit utils.py", tool: "edit_file", kind: "edit", target: "utils.py",
+      plan: "Remove old_helper(), which nothing calls", why: "old_helper() is never called anywhere.",
+      diff: [[" ", "def format_name(name):"], [" ", "    return name.strip().title()"], [" ", ""], ["-", "def old_helper(x):"], ["-", "    return x * 2"]],
+      result: "Removed old_helper() (2 lines)", undoText: "Puts old_helper() back into utils.py (2 lines)." },
+    { title: "Delete config_old.json", tool: "delete_file", kind: "delete", target: "config_old.json",
+      plan: "The name ends in _old, so it looks unused", why: "The name ends in _old, so it looks unused.",
+      usedBy: "main.py, line 3", usedLine: "CONFIG = load_config(\"config_old.json\")",
+      what: "config_old.json moves to .trash/. You can undo this.",
+      harmful: true, result: "Moved config_old.json to .trash/", undoText: "Moves config_old.json back from .trash/." },
+    { title: "Run the tests", tool: "run_bash", kind: "command", target: "pytest",
+      plan: "Make sure nothing broke", what: "Runs the command: pytest" },
+    { title: "Push to GitHub", tool: "run_bash", kind: "push", target: "git push origin main",
+      plan: "Share the cleanup with your team", why: "Share the cleanup with your team.",
+      what: "Sends your commits to origin/main. This can’t be undone from here.",
+      result: "Pushed 1 commit to origin/main" }
+  ];
+  var FILES = ["main.py", "utils.py", "config_old.json", "tests/"];
+  var STEP_MS = 1100;
+
+  /* Ask-first defaults = what most respondents chose in survey Q13 (n = 12).
+     Ties go to "don't ask" because 9/12 stop reading frequent prompts (Q15).
+     Deletes (12/12) and pushes (9/12, permanent) always ask. */
+  var SETTINGS = [
+    { key: "edit", label: "Edit files", note: "Undoable", def: true },
+    { key: "delete", label: "Delete files", note: "Always asks", def: true, locked: true },
+    { key: "secret", label: "Edit secret or config files", note: ".env, settings", def: true },
+    { key: "install", label: "Install packages", note: "pip, npm", def: true },
+    { key: "command", label: "Run other commands", note: "Tests, scripts", def: false },
+    { key: "push", label: "Push to GitHub", note: "Permanent · always asks", def: true, locked: true }
+  ];
+  function defaultSettings() { var o = {}; SETTINGS.forEach(function (s) { o[s.key] = s.def; }); return o; }
+  function allOnSettings() { var o = {}; SETTINGS.forEach(function (s) { o[s.key] = true; }); return o; }
+
+  var TAGS = {
+    auto: ["tag-auto", "Runs on its own"],
+    ask: ["tag-ask", "Asks first"],
+    choice: ["tag-choice", "Your choice"],
+    perm: ["tag-perm", "Permanent"],
+    blocked: ["tag-blocked", "Out of scope"],
+    allowed: ["tag-allowed", "Allowed for this task"]
+  };
+  var STATUS = {
+    queued: ["○", "Queued"], running: ["◐", "Running…"], waiting: ["!", "Waiting for you"],
+    done: ["✓", "Done"], skipped: ["↷", "Skipped"], failed: ["✕", "Failed"], undone: ["↶", "Undone"],
+    blocked: ["⊘", "Out of scope"], removed: ["⊘", "Removed from plan"], notrun: ["–", "Not run"]
+  };
+  var CONDITIONS = { console: "Console", prompts: "Yes/No prompts", baseline: "Plain log" };
+
+  function inScope(i) {
+    if (S.scope === "project") return true;
+    var s = STEPS[i];
+    if (s.kind === "command" || s.kind === "push" || s.target === ".") return true;
+    return S.files.indexOf(s.target) !== -1;
+  }
+  function policy(i) {
+    var s = STEPS[i];
+    if (!inScope(i)) return { decision: "block", tag: "blocked" };
+    if (s.kind === "read") return { decision: "auto", tag: "auto" };
+    if (s.kind === "push") return { decision: "ask", tag: "perm" };
+    if (S.allowTask[s.kind]) return { decision: "auto", tag: "allowed" };
+    var ask = !!S.settings[s.kind];
+    if (s.kind === "command") return { decision: ask ? "ask" : "auto", tag: "choice" };
+    return { decision: ask ? "ask" : "auto", tag: ask ? "ask" : "auto" };
+  }
+
+  /* ---------- state ---------- */
+  var S;
+  function fresh(condition) {
+    return {
+      condition: condition, screen: "start", runId: (S ? S.runId : 0) + 1,
+      preset: "risky", settings: defaultSettings(), sound: false, allowTask: {},
+      scope: "chosen", files: FILES.slice(),
+      task: "Clean up unused files in this project",
+      steps: STEPS.map(function () { return { status: "queued", result: "" }; }),
+      notes: [], current: -1, waiting: -1, decide: null, resume: null,
+      pauseRequested: false, paused: false, stopped: false, pendingUndo: null, overlay: null,
+      configDeleted: false, utilsEdited: false, pushed: false, harmExecuted: false,
+      t0: 0, log: [], logLines: [], finished: false, participant: ""
+    };
+  }
+  S = fresh("console");
+  var hintsOn = true;
+
+  /* ---------- helpers ---------- */
+  function $(sel) { return document.querySelector(sel); }
+  function esc(v) { return String(v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+  function now() { return S.t0 ? Math.round(performance.now() - S.t0) : 0; }
+  function log(type, data) { var e = { t_ms: now(), type: type }; if (data) for (var k in data) e[k] = data[k]; S.log.push(e); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function tagHtml(key) { var t = TAGS[key]; return "<span class=\"tag " + t[0] + "\">" + t[1] + "</span>"; }
+  function undoable(i) { var k = STEPS[i].kind; return (k === "edit" || k === "delete") && S.steps[i].status === "done"; }
+  function fmtSecs(ms) { return (ms / 1000).toFixed(1) + " s"; }
+  function sw(id, on, label, note, extra, compact) {
+    return "<button type=\"button\" class=\"switch-pill" + (compact ? " compact" : "") + "\" role=\"switch\" id=\"" + id + "\" aria-checked=\"" + !!on + "\"" + (extra || "") + ">" +
+      "<span class=\"sp-text\"><b>" + esc(label) + "</b>" + (note ? "<small>" + esc(note) + "</small>" : "") + "</span>" +
+      "<span class=\"track\" aria-hidden=\"true\"><span class=\"knob\"></span></span></button>";
+  }
+
+  var audio = null;
+  function primeAudio() { try { if (!audio) { var A = window.AudioContext || window.webkitAudioContext; if (A) audio = new A(); } if (audio && audio.state === "suspended") audio.resume(); } catch (e) { audio = null; } }
+  function beep() {
+    if (!S.sound || !audio) return;
+    try {
+      var o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = 880; g.gain.value = 0.06; o.connect(g); g.connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + 0.18);
+    } catch (e) { /* sound is optional */ }
+  }
+
+  var titleBase = document.title, toastTimer = null;
+  function notify(i) {
+    var el = $("#toast");
+    el.innerHTML = "<div><b>Agent needs you</b>" + esc(STEPS[i].title) + "</div><button type=\"button\" id=\"toast-go\">Review</button>";
+    el.hidden = false;
+    document.title = "(1) Agent needs you · " + titleBase;
+    beep();
+    $("#toast-go").onclick = function () { el.hidden = true; var b = document.querySelector(".card .btn"); if (b) b.focus(); };
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; }, 5000);
+  }
+  function clearNotify() { document.title = titleBase; }
+
+  /* ---------- console agent loop ---------- */
+  async function runConsole() {
+    var my = S.runId;
+    function alive() { return my === S.runId; }
+    for (var i = 0; i < STEPS.length; i++) {
+      if (!alive()) return;
+      await checkPause(); if (!alive()) return;
+      if (S.stopped) break;
+      var st = S.steps[i];
+      if (st.status === "removed") continue;
+      var p = policy(i);
+      if (p.decision === "block") {
+        st.status = "blocked"; st.result = "Outside the files you chose, so it did not run";
+        log("blocked", { step: i + 1 }); render(); await sleep(500); continue;
+      }
+      S.current = i; st.status = "running"; render();
+      await sleep(STEP_MS); if (!alive()) return;
+      if (S.stopped) { st.status = "notrun"; break; }
+      p = policy(i);
+      if (p.decision === "ask") {
+        st.status = "waiting"; S.waiting = i;
+        log("gate_shown", { step: i + 1, title: STEPS[i].title });
+        if (STEPS[i].harmful) log("harmful_shown", { step: i + 1 });
+        render(); notify(i);
+        var d = await new Promise(function (r) { S.decide = r; });
+        if (!alive()) return;
+        S.decide = null; S.waiting = -1; clearNotify(); $("#toast").hidden = true;
+        log("decision", { step: i + 1, action: d });
+        if (d === "skip") { st.status = "skipped"; st.result = "Skipped by you"; render(); await sleep(400); continue; }
+        if (d === "stop") { st.status = "notrun"; break; }
+        st.status = "running"; render(); await sleep(600); if (!alive()) return;
+      } else if (STEPS[i].harmful) {
+        log("harmful_shown", { step: i + 1 });
+      }
+      execute(i); render(); await sleep(350);
+    }
+    if (!alive()) return;
+    finish();
+  }
+
+  function execute(i) {
+    var s = STEPS[i], st = S.steps[i];
+    st.status = "done";
+    if (s.kind === "edit") S.utilsEdited = true;
+    if (s.kind === "delete") { S.configDeleted = true; S.harmExecuted = true; log("harmful_executed", { step: i + 1 }); }
+    if (s.kind === "command") {
+      if (S.configDeleted) { st.status = "failed"; st.result = "1 failed: test_main, FileNotFoundError: config_old.json"; }
+      else st.result = "4 passed";
+      log("command", { step: i + 1, result: st.result });
+      return;
+    }
+    if (s.kind === "push") S.pushed = true;
+    st.result = s.result;
+    log("executed", { step: i + 1 });
+  }
+
+  async function checkPause() {
+    if (!S.pauseRequested) return;
+    S.pauseRequested = false; S.paused = true;
+    log("paused", { after_step: S.current + 1 });
+    if (S.pendingUndo !== null) { S.overlay = { kind: "undo", step: S.pendingUndo }; S.pendingUndo = null; }
+    render();
+    await new Promise(function (r) { S.resume = r; });
+    S.resume = null; S.paused = false;
+  }
+
+  function finish() {
+    for (var i = 0; i < S.steps.length; i++) if (S.steps[i].status === "queued" || S.steps[i].status === "running") S.steps[i].status = "notrun";
+    S.screen = "summary"; S.finished = true; S.current = -1; S.waiting = -1;
+    log(S.stopped ? "stopped_end" : "finished");
+    clearNotify(); render();
+  }
+
+  /* ---------- user actions ---------- */
+  function start() {
+    primeAudio();
+    var task = $("#task"); if (task) S.task = task.value.trim() || S.task;
+    S.t0 = performance.now();
+    if (S.condition !== "console") { S.screen = "run"; log("start", { condition: S.condition }); render(); runLog(S.condition === "prompts"); return; }
+    S.screen = "plan";
+    log("start", { condition: "console", preset: S.preset, settings: S.settings, sound: S.sound, scope: S.scope, files: S.scope === "project" ? "all" : S.files.join(",") });
+    render();
+  }
+  function approvePlan() {
+    log("plan_approved", { removed: S.steps.map(function (s, i) { return s.status === "removed" ? i + 1 : null; }).filter(Boolean) });
+    S.screen = "run"; render(); runConsole();
+  }
+  function rejectPlan() { log("plan_rejected"); var c = S.condition; S = fresh(c); render(); }
+  function toggleRemove(i) { var st = S.steps[i]; st.status = st.status === "removed" ? "queued" : "removed"; render(); }
+  function decide(action) {
+    if (!S.decide) return;
+    var allow = $("#allow-task");
+    if (action === "approve" && allow && allow.getAttribute("aria-checked") === "true") {
+      var k = STEPS[S.waiting].kind; S.allowTask[k] = true; log("allow_for_task", { kind: k });
+    }
+    S.decide(action);
+  }
+  function pause() {
+    if (S.condition !== "console" || S.screen !== "run" || S.paused || S.waiting !== -1 || S.finished) return;
+    S.pauseRequested = true; log("pause_requested", { during_step: S.current + 1 }); render();
+  }
+  function resume() {
+    var box = $("#note"); var text = box ? box.value.trim() : "";
+    if (text) addNote(text);
+    log("resumed", { note: text || null });
+    S.overlay = null;
+    if (S.resume) S.resume();
+    render();
+  }
+  function addNote(text) {
+    var at = S.current + 1;
+    S.notes.push({ after: at, who: "user", text: text });
+    var reply = "Got it. I’ll follow your note.";
+    var del = STEPS.findIndex(function (s) { return s.kind === "delete"; });
+    if (/delet|config|keep/i.test(text) && S.steps[del].status === "queued") {
+      S.steps[del].status = "removed"; S.steps[del].result = "Dropped after your note";
+      reply = "Got it. I won’t delete config_old.json.";
+    }
+    S.notes.push({ after: at, who: "agent", text: reply });
+  }
+  function stop() {
+    if (S.finished || S.screen !== "run") return;
+    S.stopped = true; log("stop", { during_step: S.current + 1 });
+    if (S.decide) S.decide("stop");
+    if (S.resume) S.resume();
+    render();
+  }
+  function askUndo(i) {
+    if (S.screen === "run" && !S.paused && S.waiting === -1 && !S.finished) {
+      S.pendingUndo = i; S.pauseRequested = true; log("pause_requested", { for_undo: i + 1 }); render(); return;
+    }
+    S.overlay = { kind: "undo", step: i }; render();
+  }
+  function doUndo(i) {
+    var st = S.steps[i], s = STEPS[i];
+    st.status = "undone"; st.result = "Undone by you";
+    if (s.kind === "edit") S.utilsEdited = false;
+    if (s.kind === "delete") S.configDeleted = false;
+    S.notes.push({ after: S.current >= 0 ? S.current + 1 : STEPS.length, who: "agent", text: "Told the agent: “" + s.title + "” was undone." });
+    log("undo", { step: i + 1 });
+  }
+  function undoList(o) {
+    var list = [];
+    for (var i = 0; i < S.steps.length; i++) {
+      if (!undoable(i)) continue;
+      if (o.kind === "all" || (o.kind === "from" && i >= o.step) || (o.kind === "undo" && i === o.step)) list.push(i);
+    }
+    return list;
+  }
+  function confirmUndo() {
+    var o = S.overlay; if (!o) return;
+    undoList(o).forEach(doUndo);
+    if (o.kind === "from") log("restore_to_before", { step: o.step + 1 });
+    S.overlay = null; render();
+  }
+  function setPreset(p) {
+    S.preset = p;
+    S.settings = p === "every" ? allOnSettings() : defaultSettings();
+    log("preset", { preset: p }); render();
+  }
+  function toggleSetting(key) {
+    var def = SETTINGS.find(function (s) { return s.key === key; });
+    if (def.locked) return;
+    S.settings[key] = !S.settings[key];
+    var all = SETTINGS.every(function (s) { return S.settings[s.key]; });
+    var dflt = SETTINGS.every(function (s) { return S.settings[s.key] === s.def; });
+    S.preset = all ? "every" : dflt ? "risky" : "custom";
+    log("setting", { key: key, ask: S.settings[key] }); render();
+  }
+
+  /* ---------- log conditions: plain log (no asking) and yes/no prompts (ask every step, tool name only) ---------- */
+  async function runLog(prompts) {
+    var my = S.runId;
+    for (var i = 0; i < STEPS.length; i++) {
+      if (my !== S.runId) return;
+      if (S.stopped) break;
+      var s = STEPS[i];
+      S.current = i;
+      line(stamp() + "  " + s.tool + " " + s.target, false);
+      if (s.harmful) log("harmful_shown", { step: i + 1 });
+      if (prompts) {
+        S.waiting = i; S.steps[i].status = "waiting";
+        log("gate_shown", { step: i + 1, title: s.title });
+        render();
+        var d = await new Promise(function (r) { S.decide = r; });
+        if (my !== S.runId) return;
+        S.decide = null; S.waiting = -1;
+        log("decision", { step: i + 1, action: d });
+        if (d === "stop") { S.steps[i].status = "notrun"; break; }
+        if (d === "skip") { S.steps[i].status = "skipped"; line("          → Tool call denied by user", true); await sleep(300); continue; }
+        line("          allowed", true);
+      }
+      await sleep(STEP_MS); if (my !== S.runId) return;
+      if (S.stopped) { S.steps[i].status = "notrun"; break; }
+      execute(i);
+      line("          → " + (S.steps[i].result || "ok"), true);
+      await sleep(350);
+    }
+    if (my !== S.runId) return;
+    line(S.stopped ? stamp() + "  stopped by user" : stamp() + "  done", false);
+    finish();
+  }
+  function stamp() { var t = Math.floor(now() / 1000); return "[" + Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0") + "]"; }
+  function line(text, dim) { S.logLines.push({ text: text, dim: dim }); render(); var v = $("#logview"); if (v) v.scrollTop = v.scrollHeight; }
+
+  /* ---------- measures for the study ---------- */
+  function measures() {
+    var shown = S.log.find(function (e) { return e.type === "harmful_shown"; });
+    var harmStep = STEPS.findIndex(function (s) { return s.harmful; }) + 1;
+    var res = { harmful: "Not shown", tti: "—", recovered: "—" };
+    if (!shown) {
+      var st = S.steps[harmStep - 1].status;
+      res.harmful = st === "blocked" ? "Blocked by scope" : st === "removed" ? "Removed before it ran" : "Not reached";
+      return res;
+    }
+    res.harmful = S.harmExecuted ? "Ran (missed)" : "Caught before it ran";
+    var act = S.log.find(function (e) {
+      return e.t_ms >= shown.t_ms && (e.type === "stop" || e.type === "pause_requested" ||
+        (e.type === "decision" && e.step === harmStep && e.action !== "approve"));
+    });
+    if (act) res.tti = fmtSecs(act.t_ms - shown.t_ms);
+    var canUndo = S.condition === "console";
+    res.recovered = S.harmExecuted ? (S.steps[harmStep - 1].status === "undone" ? "Yes, undone" : canUndo ? "No" : "No undo here") : "Not needed";
+    return res;
+  }
+
+  /* ---------- rendering ---------- */
+  function hintText() {
+    if (S.condition === "baseline") {
+      if (S.screen === "start") return "<b>Plain log:</b> approvals are switched off. Press Start, watch the log, and press Stop if something looks wrong.";
+      if (!S.finished) return "Everything runs without asking. Press <b>Stop</b> if you see a problem.";
+      return "Run finished. Try another condition to compare.";
+    }
+    if (S.condition === "prompts") {
+      if (S.screen === "start") return "<b>Yes/No prompts:</b> like today’s default tools, it asks before every step but only names the tool.";
+      if (S.waiting !== -1) return "Decide with only the tool name and file. Press <b>Yes</b> (Y) or <b>No</b> (N).";
+      if (!S.finished) return "Working…";
+      return "Run finished. Try another condition to compare.";
+    }
+    if (S.screen === "start") return "Pick the files it may touch and what it should ask about, then press <b>Start</b>.";
+    if (S.screen === "plan") return "Read the plan and the reason for each step. Remove any you don’t want, then press <b>Approve plan</b>.";
+    if (S.overlay) return "Check what will be restored, then press <b>Undo</b>.";
+    if (S.waiting !== -1) {
+      var k = STEPS[S.waiting].kind;
+      if (k === "edit") return "Read the diff, then press <b>Approve</b> (or A).";
+      if (k === "delete") return "Notice <b>Used by main.py</b>? Press <b>Skip</b> (or S).";
+      if (k === "push") return "This is permanent. <b>Skip</b> is the safe choice.";
+      return "You set commands to ask first.";
+    }
+    if (S.paused) return "Type a note such as “don’t delete config files”, then press <b>Resume</b>.";
+    if (S.pauseRequested) return "The agent will pause after the current step.";
+    if (S.screen === "run") return "Try <b>Pause</b> to check on it or add a note.";
+    return "Press <b>Undo</b> on any step, or go back to before a step.";
+  }
+
+  function statusText() {
+    if (S.screen === "start") return "Ready";
+    if (S.screen === "plan") return "Plan ready";
+    if (S.finished) return S.stopped ? "Stopped" : "Finished";
+    if (S.waiting !== -1) return "Waiting for you";
+    if (S.paused) return "Paused";
+    if (S.pauseRequested) return "Pausing…";
+    return "Working";
+  }
+
+  function render() {
+    var hint = $("#hint");
+    hint.hidden = !hintsOn;
+    hint.innerHTML = hintText();
+    $("#hints").setAttribute("aria-checked", hintsOn);
+    Object.keys(CONDITIONS).forEach(function (c) { $("#cond-" + c).setAttribute("aria-pressed", S.condition === c); });
+    var root = $("#root");
+    var keep = captureInputs();
+    root.innerHTML = S.condition === "console" ? consoleHtml() : logHtml();
+    restoreInputs(keep);
+    wire();
+  }
+
+  function captureInputs() {
+    var out = {};
+    ["task", "note", "pid"].forEach(function (id) { var el = document.getElementById(id); if (el) out[id] = el.value; });
+    var a = document.getElementById("allow-task"); if (a) out._allow = a.getAttribute("aria-checked");
+    if (document.activeElement && document.activeElement.id) out._focus = document.activeElement.id;
+    return out;
+  }
+  function restoreInputs(k) {
+    ["task", "note", "pid"].forEach(function (id) { var el = document.getElementById(id); if (el && k[id] !== undefined) el.value = k[id]; });
+    var a = document.getElementById("allow-task"); if (a && k._allow) a.setAttribute("aria-checked", k._allow);
+    if (k._focus) { var f = document.getElementById(k._focus); if (f) f.focus(); }
+  }
+
+  function topbarHtml(isConsole) {
+    var st = statusText();
+    var running = S.screen === "run" && !S.finished;
+    var cls = st === "Waiting for you" ? " wait" : (st === "Working" || st === "Finished") ? " ok" : "";
+    var html = "<div class=\"topbar\"><div class=\"task\"><small>Task</small><strong>" + esc(S.task) + "</strong></div><div class=\"top-actions\">";
+    html += "<span class=\"status" + cls + "\" aria-live=\"polite\">" + st + "</span>";
+    if (isConsole && S.screen !== "start") {
+      html += sw("strict-toggle", S.preset === "every", "Ask every change", "", "", true);
+      var pauseLabel = S.paused ? "Resume" : S.pauseRequested ? "Pausing…" : "Pause";
+      var pauseDisabled = !running || S.pauseRequested || S.waiting !== -1;
+      html += "<button type=\"button\" class=\"btn-pause\" id=\"pause\"" + (pauseDisabled && !S.paused ? " disabled" : "") +
+        (S.waiting !== -1 ? " title=\"The agent is already waiting for you\"" : "") + ">" + pauseLabel + "</button>";
+    }
+    html += "<button type=\"button\" class=\"btn-stop\" id=\"stop\"" + (running ? "" : " disabled") + ">Stop</button></div></div>";
+    return html;
+  }
+
+  function timelineHtml() {
+    var done = S.steps.filter(function (s) { return ["done", "failed", "skipped", "undone", "blocked"].indexOf(s.status) !== -1; }).length;
+    var h = "<div class=\"col\"><div class=\"col-h\"><h2>Timeline</h2><span>" + done + " of " + STEPS.length + " handled</span></div><ol class=\"steps\">";
+    function notesAt(n) {
+      return S.notes.filter(function (x) { return x.after === n; }).map(function (x) {
+        return "<li class=\"note " + x.who + "\">" + (x.who === "user" ? "<b>Your note:</b> " : "") + esc(x.text) + "</li>";
+      }).join("");
+    }
+    h += notesAt(0);
+    for (var i = 0; i < STEPS.length; i++) {
+      var s = STEPS[i], st = S.steps[i], meta = STATUS[st.status], p = policy(i);
+      var ico = st.status === "running" ? "<span class=\"spin\">◐</span>" : meta[0];
+      h += "<li class=\"step tile sub s-" + st.status + "\"><span class=\"ico\" aria-hidden=\"true\">" + ico + "</span><div><div class=\"t\">" + (i + 1) + ". " + esc(s.title) + "</div>" +
+        "<div class=\"meta\">" + tagHtml(p.tag) + "<span>" + meta[1] + "</span></div>" +
+        (st.result ? "<div class=\"res\">" + esc(st.result) + "</div>" : "") + "</div>" +
+        (undoable(i) ? "<button type=\"button\" class=\"btn-undo\" data-undo=\"" + i + "\">Undo</button>" : "<span></span>") + "</li>";
+      h += notesAt(i + 1);
+    }
+    return h + "</ol></div>";
+  }
+
+  function startHtml() {
+    var h = "<div class=\"col\"><h1 class=\"panel-title\">Give the agent a task</h1>" +
+      "<div class=\"group\"><label class=\"lbl\" for=\"task\">Task</label><textarea id=\"task\">" + esc(S.task) + "</textarea></div>";
+    if (S.condition === "baseline" || S.condition === "prompts") {
+      h += "<p class=\"panel-sub\">" + (S.condition === "baseline"
+        ? "Plain log: the agent runs every step without asking. You see a scrolling log and a Stop button."
+        : "Yes/No prompts: before every step the agent asks “Allow tool?” with only the tool name and file. No plan, no details, no undo.") + "</p>";
+      return h + "<div class=\"row\"><button type=\"button\" class=\"btn btn-primary\" id=\"start\">Start</button></div></div>";
+    }
+    h += "<div class=\"group\"><span class=\"lbl\" id=\"scope-lbl\">Files it may touch</span>" +
+      "<div><div class=\"seg\" role=\"radiogroup\" aria-labelledby=\"scope-lbl\">" +
+      "<button type=\"button\" role=\"radio\" data-scope=\"chosen\" aria-checked=\"" + (S.scope === "chosen") + "\">Only files I choose</button>" +
+      "<button type=\"button\" role=\"radio\" data-scope=\"project\" aria-checked=\"" + (S.scope === "project") + "\">Whole folder</button></div></div>";
+    if (S.scope === "chosen") {
+      h += "<div class=\"chips\">" + FILES.map(function (f, j) {
+        var on = S.files.indexOf(f) !== -1;
+        return "<label class=\"chip" + (on ? " on" : "") + "\"><input type=\"checkbox\" id=\"file-" + j + "\" data-file=\"" + esc(f) + "\"" + (on ? " checked" : "") + ">" + esc(f) + "</label>";
+      }).join("") + "</div>";
+    }
+    h += "</div><div class=\"group\"><span class=\"lbl\" id=\"ask-lbl\">Ask me before it…</span>" +
+      "<div><div class=\"seg\" role=\"radiogroup\" aria-labelledby=\"ask-lbl\">" +
+      "<button type=\"button\" role=\"radio\" data-preset=\"risky\" aria-checked=\"" + (S.preset === "risky") + "\">Risky steps</button>" +
+      "<button type=\"button\" role=\"radio\" data-preset=\"every\" aria-checked=\"" + (S.preset === "every") + "\">Every change</button>" +
+      (S.preset === "custom" ? "<button type=\"button\" role=\"radio\" aria-checked=\"true\" disabled>Custom</button>" : "") + "</div></div>" +
+      "<div class=\"switch-list\">" + SETTINGS.map(function (s) {
+        return sw("set-" + s.key, S.settings[s.key], s.label, s.note, (s.locked ? " disabled title=\"Always asks\"" : "") + " data-setting=\"" + s.key + "\" aria-label=\"Ask before: " + esc(s.label) + "\"");
+      }).join("") +
+      sw("sound", S.sound, "Sound when it needs me", "A notification always shows") +
+      "</div><p class=\"foot-note\">Defaults follow what most of our survey respondents chose (n = 12).</p></div>";
+    return h + "<div class=\"row\"><button type=\"button\" class=\"btn btn-primary\" id=\"start\">Start</button></div></div>";
+  }
+
+  function planHtml() {
+    var active = 0, asks = 0, perm = 0, files = {};
+    var items = STEPS.map(function (s, i) {
+      var st = S.steps[i], p = policy(i), removed = st.status === "removed";
+      if (!removed && p.decision !== "block") {
+        active++;
+        if (p.decision === "ask") asks++;
+        if (p.tag === "perm") perm++;
+        if (s.kind === "edit" || s.kind === "delete") files[s.target] = 1;
+      }
+      return "<li class=\"tile sub" + (removed ? " removed" : "") + "\"><span class=\"n\">" + (i + 1) + "</span><div><div class=\"pt\">" + esc(s.title) + "</div>" +
+        "<div class=\"pw\">Why: " + esc(s.plan) + "</div><div class=\"pm\">" + tagHtml(p.tag) +
+        (s.kind === "edit" || s.kind === "delete" ? "<span class=\"tag tag-choice\">Undoable</span>" : "") + "</div></div>" +
+        (p.decision === "block" ? "<span class=\"kbd\">Skipped: outside scope</span>" :
+          "<button type=\"button\" class=\"linkbtn\" data-remove=\"" + i + "\">" + (removed ? "Put back" : "Remove") + "</button>") + "</li>";
+    }).join("");
+    return "<div class=\"col\"><h1 class=\"panel-title\">Here’s my plan</h1><p class=\"panel-sub\">Nothing runs until you approve.</p>" +
+      "<div class=\"facts\"><span class=\"fact\">" + active + " steps</span><span class=\"fact\">" + asks + " will ask you</span><span class=\"fact\">" + perm + " permanent</span><span class=\"fact\">Changes " + Object.keys(files).length + " files</span></div>" +
+      "<ol class=\"plan-list\">" + items + "</ol>" +
+      "<div class=\"row\"><button type=\"button\" class=\"btn btn-primary\" id=\"approve-plan\">Approve plan</button><button type=\"button\" class=\"btn btn-secondary\" id=\"reject-plan\">Reject</button></div></div>";
+  }
+
+  function cardHtml(i) {
+    var s = STEPS[i], p = policy(i), perm = p.tag === "perm", risky = perm || !!s.usedBy;
+    var h = "<div class=\"col\"><div class=\"col-h\"><h2>Needs your approval</h2><span>Step " + (i + 1) + " of " + STEPS.length + "</span></div>" +
+      "<div class=\"card tile " + (perm || s.usedBy ? "glow-pink" : "glow-br") + "\"><div class=\"card-head\">" + tagHtml(p.tag) +
+      (s.kind === "edit" || s.kind === "delete" ? "<span class=\"tag tag-choice\">↶ Undoable</span>" : "") + "</div>" +
+      "<h3>" + esc(s.title) + "</h3>";
+    if (s.why) h += "<p class=\"why\"><b>Why:</b> " + esc(s.why) + "</p>";
+    if (s.usedBy) h += "<div class=\"warn\"><b>⚠ Used by " + esc(s.usedBy) + "</b><code>" + esc(s.usedLine) + "</code></div>";
+    if (s.diff) {
+      h += "<div class=\"diff\" role=\"table\" aria-label=\"Changes to " + esc(s.target) + "\">" + s.diff.map(function (d) {
+        var cls = d[0] === "-" ? "del" : d[0] === "+" ? "add" : "", lbl = d[0] === "-" ? "Removed" : d[0] === "+" ? "Added" : "";
+        return "<div class=\"" + cls + "\" role=\"row\"><span class=\"lbl\">" + lbl + "</span><span class=\"code\">" + esc(d[1]) + "</span></div>";
+      }).join("") + "</div>";
+    }
+    if (s.what) h += "<p class=\"what\">" + esc(s.what) + "</p>";
+    if (!risky && (s.kind === "edit" || s.kind === "command")) {
+      var noun = s.kind === "edit" ? "edits" : "commands";
+      h += sw("allow-task", false, "Don’t ask again for " + noun + " in this task", "");
+    }
+    var approve = "<button type=\"button\" class=\"btn " + (risky ? "btn-secondary" : "btn-primary") + "\" id=\"approve\">" + (perm ? "Push anyway" : "Approve") + "</button>";
+    var skip = "<button type=\"button\" class=\"btn " + (risky ? "btn-primary" : "btn-secondary") + "\" id=\"skip\">Skip</button>";
+    h += "<div class=\"row\">" + (risky ? skip + approve : approve + skip) + "</div><p class=\"kbd\">Keys: A approve · S skip</p></div></div>";
+    return h;
+  }
+
+  function pausedHtml() {
+    var last = -1;
+    for (var i = S.steps.length - 1; i >= 0; i--) if (undoable(i)) { last = i; break; }
+    return "<div class=\"col\"><div class=\"working tile glow-c\"><h1 class=\"panel-title\">Paused after step " + (S.current + 1) + "</h1>" +
+      "<p class=\"panel-sub\">Nothing runs while paused. Next: " + esc(nextTitle()) + "</p></div>" +
+      "<div class=\"group\"><label class=\"lbl\" for=\"note\">Add a note for the agent (optional)</label><textarea id=\"note\" placeholder=\"e.g. Don’t delete config files\"></textarea></div>" +
+      "<div class=\"row\"><button type=\"button\" class=\"btn btn-primary\" id=\"resume\">Resume</button>" +
+      (last !== -1 ? "<button type=\"button\" class=\"btn btn-secondary\" data-undo=\"" + last + "\">Undo last change</button>" : "") +
+      "<button type=\"button\" class=\"btn btn-danger\" id=\"stop2\">Stop task</button></div></div>";
+  }
+  function nextTitle() {
+    for (var i = S.current + 1; i < STEPS.length; i++) if (S.steps[i].status === "queued") return STEPS[i].title;
+    return "nothing left";
+  }
+
+  function workingHtml() {
+    var i = S.current, s = i >= 0 ? STEPS[i] : null;
+    return "<div class=\"col\"><div class=\"col-h\"><h2>Now</h2><span>Step " + (i + 1) + " of " + STEPS.length + "</span></div>" +
+      "<div class=\"working tile glow-br\"><div class=\"panel-title\">" + (s ? esc(s.title) : "Starting…") + "</div>" +
+      (s ? "<p class=\"panel-sub mono\">" + esc(s.tool + " " + s.target) + "</p>" : "") +
+      "<p class=\"panel-sub\">Next: " + esc(nextTitle()) + "</p>" +
+      (S.pauseRequested ? "<p><b>Pausing after this step…</b></p>" : "<p class=\"panel-sub\">You can pause at any time.</p>") + "</div></div>";
+  }
+
+  function undoHtml() {
+    var o = S.overlay, list = undoList(o);
+    var title = o.kind === "all" ? "Undo the whole task?" : o.kind === "from" ? "Go back to before step " + (o.step + 1) + "?" : "Undo step " + (o.step + 1) + "?";
+    var later = o.kind === "undo" ? undoList({ kind: "from", step: o.step }).length > 1 : false;
+    var warn = [];
+    if (list.some(function (j) { return STEPS[j].kind === "delete"; }) && ["done", "failed"].indexOf(S.steps[4].status) !== -1)
+      warn.push("The tests (step 5) ran after this change. Run them again after undoing.");
+    if (S.pushed) warn.push("Step 6 already pushed to GitHub. Undo restores your files only.");
+    return "<div class=\"col\"><h1 class=\"panel-title\">" + title + "</h1>" +
+      "<div class=\"sum-sec tile sub glow-tl\"><h3>This will</h3><ul>" + list.map(function (j) { return "<li><b>" + esc(STEPS[j].title) + ":</b> " + esc(STEPS[j].undoText) + "</li>"; }).join("") + "</ul></div>" +
+      (warn.length ? "<div class=\"warn\">" + warn.map(function (w) { return "<span>⚠ " + esc(w) + "</span>"; }).join("") + "</div>" : "") +
+      "<div class=\"row\"><button type=\"button\" class=\"btn btn-primary\" id=\"confirm-undo\">Undo</button>" +
+      (later ? "<button type=\"button\" class=\"btn btn-secondary\" id=\"undo-from\">Go back to before this step</button>" : "") +
+      "<button type=\"button\" class=\"btn btn-quiet\" id=\"cancel-undo\">Cancel</button></div></div>";
+  }
+
+  function measuresHtml() {
+    var m = measures();
+    var total = S.log.length ? fmtSecs(S.log[S.log.length - 1].t_ms) : "—";
+    return "<div class=\"measures\"><div class=\"measure tile sub glow-br\"><span>Harmful step (delete)</span><b>" + esc(m.harmful) + "</b></div>" +
+      "<div class=\"measure tile sub\"><span>Time to intervene</span><b>" + esc(m.tti) + "</b></div>" +
+      "<div class=\"measure tile sub\"><span>Recovered with undo</span><b>" + esc(m.recovered) + "</b></div>" +
+      "<div class=\"measure tile sub glow-tl\"><span>Total time</span><b>" + total + "</b></div></div>" +
+      "<details class=\"study tile sub\"><summary>Study log (for the evaluation)</summary><div class=\"inner\">" +
+      "<div class=\"group\"><label class=\"lbl\" for=\"pid\">Participant ID</label><input type=\"text\" id=\"pid\" placeholder=\"P01\"></div>" +
+      "<textarea id=\"logjson\" readonly>" + esc(JSON.stringify({ condition: S.condition, preset: S.preset, events: S.log }, null, 1)) + "</textarea>" +
+      "<div class=\"row\"><button type=\"button\" class=\"btn btn-secondary\" id=\"copy-log\">Copy log</button><span class=\"kbd\" id=\"copy-msg\" aria-live=\"polite\"></span></div></div></details>";
+  }
+
+  function summaryHtml() {
+    var changed = [], cmds = [], other = [], undo = [];
+    STEPS.forEach(function (s, i) {
+      var st = S.steps[i];
+      if (s.kind === "edit" || s.kind === "delete") {
+        if (st.status === "done") changed.push(esc(s.target) + ": " + esc(st.result));
+        if (st.status === "undone") changed.push(esc(s.target) + ": changed, then undone");
+      }
+      if ((s.kind === "command" || s.kind === "push") && (st.status === "done" || st.status === "failed")) cmds.push("<span class=\"mono\">" + esc(s.target) + "</span>: " + esc(st.result));
+      if (["skipped", "failed", "blocked", "removed", "notrun"].indexOf(st.status) !== -1) other.push(esc(s.title) + ": " + STATUS[st.status][1].toLowerCase());
+      if (undoable(i)) undo.push(i);
+    });
+    function sec(t, arr) { return "<div class=\"sum-sec tile sub\"><h3>" + t + "</h3>" + (arr.length ? "<ul><li>" + arr.join("</li><li>") + "</li></ul>" : "<p class=\"panel-sub\">None</p>") + "</div>"; }
+    var undoSec = "<div class=\"sum-sec tile sub glow-br\"><div class=\"sum-row\"><h3>You can still undo</h3>" +
+      (undo.length > 1 ? "<button type=\"button\" class=\"linkbtn\" id=\"undo-all\">Undo whole task</button>" : "") + "</div>" +
+      (undo.length ? undo.map(function (j) { return "<div class=\"sum-row\"><span>" + esc(STEPS[j].title) + "</span><button type=\"button\" class=\"btn-undo\" data-undo=\"" + j + "\">Undo</button></div>"; }).join("") : "<p class=\"panel-sub\">Nothing left to undo</p>") + "</div>";
+    return "<div class=\"col\"><h1 class=\"panel-title\">" + (S.stopped ? "Stopped by you" : "Task finished") + "</h1>" +
+      sec("Files changed", changed) + sec("Commands run", cmds) + sec("Skipped, failed or not run", other) + undoSec + measuresHtml() + "</div>";
+  }
+
+  function consoleHtml() {
+    var right;
+    if (S.screen === "start") right = startHtml();
+    else if (S.screen === "plan") right = planHtml();
+    else if (S.overlay) right = undoHtml();
+    else if (S.screen === "summary") right = summaryHtml();
+    else if (S.waiting !== -1) right = cardHtml(S.waiting);
+    else if (S.paused) right = pausedHtml();
+    else right = workingHtml();
+    return "<section class=\"app tile glow-br\" aria-label=\"Agent console\">" + topbarHtml(true) + "<div class=\"body\">" + timelineHtml() + right + "</div></section>";
+  }
+
+  function logHtml() {
+    var label = CONDITIONS[S.condition];
+    var h = "<section class=\"app tile glow-tl\" aria-label=\"" + label + " condition\">" + topbarHtml(false);
+    if (S.screen === "start") return h + "<div class=\"body\">" + startHtml() + "</div></section>";
+    h += "<div class=\"logview\" id=\"logview\" role=\"log\" aria-live=\"polite\">" +
+      S.logLines.map(function (l) { return "<div" + (l.dim ? " class=\"dim\"" : "") + ">" + esc(l.text) + "</div>"; }).join("") + "</div>";
+    if (S.condition === "prompts" && S.waiting !== -1) {
+      h += "<div class=\"prompt pill-surface\"><span>Allow " + esc(STEPS[S.waiting].tool) + "?</span><span class=\"row\">" +
+        "<button type=\"button\" class=\"btn btn-secondary\" id=\"approve\">Yes</button><button type=\"button\" class=\"btn btn-secondary\" id=\"skip\">No</button></span></div>";
+    }
+    if (S.finished) h += "<div class=\"col\">" + measuresHtml() + "</div>";
+    return h + "</section>";
+  }
+
+  /* ---------- wiring ---------- */
+  function on(id, fn) { var el = document.getElementById(id); if (el) el.onclick = fn; }
+  function flip(el) { el.setAttribute("aria-checked", el.getAttribute("aria-checked") === "true" ? "false" : "true"); }
+  function wire() {
+    on("start", start); on("approve-plan", approvePlan); on("reject-plan", rejectPlan);
+    on("approve", function () { decide("approve"); }); on("skip", function () { decide("skip"); });
+    on("pause", function () { if (S.paused) resume(); else pause(); });
+    on("stop", stop); on("stop2", stop); on("resume", resume);
+    on("confirm-undo", confirmUndo); on("cancel-undo", function () { S.overlay = null; render(); });
+    on("undo-from", function () { S.overlay = { kind: "from", step: S.overlay.step }; confirmUndo(); });
+    on("undo-all", function () { S.overlay = { kind: "all" }; render(); });
+    on("strict-toggle", function () { setPreset(S.preset === "every" ? "risky" : "every"); });
+    on("sound", function () { S.sound = !S.sound; primeAudio(); render(); });
+    on("allow-task", function () { flip(this); });
+    on("copy-log", copyLog);
+    document.querySelectorAll("[data-undo]").forEach(function (b) { b.onclick = function () { askUndo(+b.getAttribute("data-undo")); }; });
+    document.querySelectorAll("[data-remove]").forEach(function (b) { b.onclick = function () { toggleRemove(+b.getAttribute("data-remove")); }; });
+    document.querySelectorAll("[data-scope]").forEach(function (b) { b.onclick = function () { S.scope = b.getAttribute("data-scope"); render(); }; });
+    document.querySelectorAll("[data-preset]").forEach(function (b) { b.onclick = function () { setPreset(b.getAttribute("data-preset")); }; });
+    document.querySelectorAll("[data-setting]").forEach(function (b) { b.onclick = function () { toggleSetting(b.getAttribute("data-setting")); }; });
+    document.querySelectorAll("[data-file]").forEach(function (c) {
+      c.onchange = function () {
+        var f = c.getAttribute("data-file");
+        S.files = S.files.filter(function (x) { return x !== f; });
+        if (c.checked) S.files.push(f);
+        render();
+      };
+    });
+    var pid = document.getElementById("pid");
+    if (pid) pid.oninput = function () { S.participant = pid.value; };
+  }
+
+  function copyLog() {
+    var data = JSON.stringify({ participant: S.participant || null, condition: S.condition, preset: S.preset, settings: S.settings, measures: measures(), events: S.log }, null, 1);
+    var ta = $("#logjson"); ta.value = data;
+    var msg = $("#copy-msg");
+    function fallback() { ta.focus(); ta.select(); msg.textContent = "Selected. Press Ctrl+C to copy."; }
+    try {
+      navigator.clipboard.writeText(data).then(function () { msg.textContent = "Copied."; }, fallback);
+    } catch (e) { fallback(); }
+  }
+
+  function restart(condition) { S = fresh(condition || S.condition); $("#toast").hidden = true; clearNotify(); render(); }
+  $("#restart").onclick = function () { restart(); };
+  Object.keys(CONDITIONS).forEach(function (c) { $("#cond-" + c).onclick = function () { restart(c); }; });
+  $("#hints").onclick = function () { hintsOn = !hintsOn; render(); };
+
+  document.addEventListener("keydown", function (e) {
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || e.ctrlKey || e.metaKey || e.altKey) return;
+    var k = e.key.toLowerCase();
+    if (S.waiting !== -1 && (k === "a" || k === "y")) { e.preventDefault(); decide("approve"); }
+    else if (S.waiting !== -1 && (k === "s" || k === "n")) { e.preventDefault(); decide("skip"); }
+    else if (k === "p" && S.condition === "console") { e.preventDefault(); if (S.paused) resume(); else pause(); }
+  });
+
+  render();
+})();
+</script>

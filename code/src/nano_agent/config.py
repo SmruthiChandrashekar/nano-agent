@@ -5,20 +5,37 @@ from pathlib import Path
 
 import yaml
 
+PROVIDERS = ("gemini", "anthropic")
+DEFAULT_PROVIDER = "gemini"
+DEFAULT_MODELS = {
+    "gemini": "gemini-3.7-flash",
+    "anthropic": "claude-sonnet-4-6",
+}
+
 
 @dataclass
 class AgentConfig:
-    """Top-level agent configuration."""
+    """Top-level agent configuration.
 
-    model: str = "claude-sonnet-4-6"
+    ``model`` left empty means "the default model for this provider".
+    """
+
+    provider: str = DEFAULT_PROVIDER
+    model: str = ""
     max_tokens: int = 16000
     max_turns: int = 20
     thinking_mode: str = "adaptive"
     thinking_budget_tokens: int | None = None
     skip_approval: bool = False
 
+    def __post_init__(self) -> None:
+        if not self.model and self.provider in DEFAULT_MODELS:
+            self.model = DEFAULT_MODELS[self.provider]
+
     def validate(self) -> None:
-        """Reject settings that the agent or Anthropic API cannot use."""
+        """Reject settings that the agent or the model API cannot use."""
+        if self.provider not in PROVIDERS:
+            raise ValueError("provider must be one of: " + ", ".join(PROVIDERS))
         if self.max_tokens < 1:
             raise ValueError("max_tokens must be at least 1")
         if self.max_turns < 1:
@@ -32,8 +49,10 @@ class AgentConfig:
                 raise ValueError(
                     "thinking_budget_tokens is required when thinking_mode is enabled"
                 )
-            if self.thinking_budget_tokens < 1024:
+            if self.provider == "anthropic" and self.thinking_budget_tokens < 1024:
                 raise ValueError("thinking_budget_tokens must be at least 1024")
+            if self.thinking_budget_tokens < 0:
+                raise ValueError("thinking_budget_tokens must not be negative")
             if self.thinking_budget_tokens >= self.max_tokens:
                 raise ValueError("thinking_budget_tokens must be less than max_tokens")
         elif self.thinking_budget_tokens is not None:
@@ -75,7 +94,8 @@ def _parse_config(path: Path) -> AgentConfig:
     raw = yaml.safe_load(path.read_text()) or {}
 
     config = AgentConfig(
-        model=raw.get("model", "claude-sonnet-4-6"),
+        provider=raw.get("provider", DEFAULT_PROVIDER),
+        model=raw.get("model") or "",
         max_tokens=raw.get("max_tokens", 16000),
         max_turns=raw.get("max_turns", 20),
         thinking_mode=raw.get("thinking_mode", "adaptive"),

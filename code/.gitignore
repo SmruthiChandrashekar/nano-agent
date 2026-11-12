@@ -11,3 +11,5 @@ nano-agent.yaml
 .nano-agent.yml
 .nano-agent.yaml
 nano-agent.log.*
+.nano-agent/
+.trash/
